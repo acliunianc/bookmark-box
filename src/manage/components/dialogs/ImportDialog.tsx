@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from 'react'
-import { Button, Chip, Spinner } from '@heroui/react'
+import { Button, Checkbox, Chip, Spinner } from '@heroui/react'
 import { normalizeUrl } from '../../../core/normalizeUrl'
 import {
   folderTagPlan,
@@ -10,7 +10,7 @@ import {
   type ParseResult,
 } from '../../../core/parseTree'
 import { send, type TreeApplyResult } from '../../../shared/messages'
-import type { AutoTagMode, Bookmark, Settings } from '../../../shared/types'
+import type { Bookmark, FolderMode, Settings } from '../../../shared/types'
 import { Dialog } from '../../../ui/Dialog'
 import { RadioCardGroup } from '../../../ui/RadioCardGroup'
 import { useToast } from '../../../ui/toast'
@@ -41,9 +41,9 @@ export function ImportDialog({ open, bookmarks, settings, onClose, onImported }:
   const [source, setSource] = useState<'browser' | 'html'>('html')
   const [parsed, setParsed] = useState<ParseResult | null>(null)
   const [conflict, setConflict] = useState<'keep' | 'overwrite'>('keep')
-  const [autoTagMode, setAutoTagMode] = useState<AutoTagMode>('leaf')
-  /* 被用户选为「分组」的文件夹路径 */
-  const [groupPaths, setGroupPaths] = useState<Set<string>>(new Set())
+  const [autoTag, setAutoTag] = useState(true)
+  /* 被用户显式改过处理方式的文件夹：路径 → tag / group / none */
+  const [folderModes, setFolderModes] = useState<Record<string, FolderMode>>({})
   const [busy, setBusy] = useState(false)
   const [report, setReport] = useState<TreeApplyResult | null>(null)
   const [lastTreeSnapshotId, setLastTreeSnapshotId] = useState<number | null>(null)
@@ -53,8 +53,8 @@ export function ImportDialog({ open, bookmarks, settings, onClose, onImported }:
     setSource('html')
     setParsed(null)
     setConflict('keep')
-    setAutoTagMode('leaf')
-    setGroupPaths(new Set())
+    setAutoTag(true)
+    setFolderModes({})
     setReport(null)
     setBusy(false)
     setLastTreeSnapshotId(null)
@@ -90,13 +90,13 @@ export function ImportDialog({ open, bookmarks, settings, onClose, onImported }:
     }
   }, [parsed, settings, existingNormUrls])
 
-  /** 会自动生成的标签与分组的预览（按当前策略 + 逐文件夹配置推导） */
+  /** 会自动生成的标签与分组的预览（按逐文件夹配置推导） */
   const planPreview = useMemo(() => {
-    if (!parsed || autoTagMode === 'none') return { tags: [] as string[], groups: [] as string[] }
+    if (!parsed) return { tags: [] as string[], groups: [] as string[] }
     const names = new Set<string>()
     const groups = new Set<string>()
     for (const item of parsed.items) {
-      for (const entry of folderTagPlan(item.path, autoTagMode, groupPaths)) {
+      for (const entry of folderTagPlan(item.path, folderModes, autoTag)) {
         names.add(entry.name)
         // 只有真正收到标签的分组才会被创建
         if (entry.groupName) groups.add(entry.groupName)
@@ -104,7 +104,7 @@ export function ImportDialog({ open, bookmarks, settings, onClose, onImported }:
     }
     const sort = (a: string, b: string) => a.localeCompare(b, 'zh-Hans-CN')
     return { tags: [...names].sort(sort), groups: [...groups].sort(sort) }
-  }, [parsed, autoTagMode, groupPaths])
+  }, [parsed, autoTag, folderModes])
 
   const handleFile = async (file: File) => {
     setBusy(true)
@@ -154,7 +154,7 @@ export function ImportDialog({ open, bookmarks, settings, onClose, onImported }:
         source: parsed.source,
         items: parsed.items,
         root: preview.root,
-        options: { conflict, autoTagMode, groupPaths: [...groupPaths] },
+        options: { conflict, autoTag, folderModes },
       })
       setReport(result)
       setLastTreeSnapshotId(lastTree?.id ?? null)
@@ -301,33 +301,30 @@ export function ImportDialog({ open, bookmarks, settings, onClose, onImported }:
             ]}
           />
 
-          <RadioCardGroup
-            aria-label="按文件夹路径生成标签"
-            label="按文件夹路径生成标签"
-            layout="row"
-            value={autoTagMode}
-            onChange={(value) => setAutoTagMode(value as AutoTagMode)}
-            options={[
-              { value: 'none', label: '不生成标签' },
-              {
-                value: 'leaf',
-                label: '仅末级文件夹名',
-                description: '书签栏/开发工具/前端 → 标签「前端」',
-              },
-              {
-                value: 'ancestors',
-                label: '末级 + 所有祖先文件夹名',
-                description: '书签栏/开发工具/前端 → 标签「书签栏」「开发工具」「前端」',
-              },
-            ]}
-          />
+          <div className="rounded-[var(--radius)] border border-[var(--border)] p-3">
+            <Checkbox isSelected={autoTag} onChange={setAutoTag}>
+              <Checkbox.Content>
+                <Checkbox.Control>
+                  <Checkbox.Indicator />
+                </Checkbox.Control>
+                <span className="flex flex-col">
+                  <span className="text-sm font-medium">按文件夹路径生成标签</span>
+                  <span className="mt-0.5 text-xs text-[var(--muted)]">
+                    默认勾选。取消勾选后不会自动生成任何标签与分组，下方各文件夹的处理方式一并失效
+                  </span>
+                </span>
+              </Checkbox.Content>
+            </Checkbox>
+          </div>
 
-          <ImportFolderPlan
-            root={preview.root}
-            autoTagMode={autoTagMode}
-            groupPaths={groupPaths}
-            onChange={setGroupPaths}
-          />
+          {/* 不生成标签时整块配置没有意义，直接不渲染 */}
+          {autoTag ? (
+            <ImportFolderPlan
+              root={preview.root}
+              folderModes={folderModes}
+              onChange={setFolderModes}
+            />
+          ) : null}
 
           {planPreview.tags.length > 0 ? (
             <div className="rounded-[var(--radius)] bg-[var(--surface-secondary)] px-3 py-2">

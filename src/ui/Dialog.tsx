@@ -29,8 +29,12 @@ export function Dialog({
   closeOnBackdrop = true,
 }: DialogProps) {
   return (
-    <Modal isOpen={open} onOpenChange={(next) => (next ? undefined : onClose())}>
-      <Modal.Backdrop isDismissable={closeOnBackdrop}>
+    <Modal>
+      <Modal.Backdrop
+        isOpen={open}
+        onOpenChange={(next) => (next ? undefined : onClose())}
+        isDismissable={closeOnBackdrop}
+      >
         <Modal.Container placement="center" scroll="inside">
           <Modal.Dialog style={{ maxWidth: width }}>
             <Modal.CloseTrigger />

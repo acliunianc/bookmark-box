@@ -16,6 +16,10 @@ interface ToolbarProps {
   onViewChange: (view: ViewMode) => void
   multiSelect: boolean
   onToggleMultiSelect: () => void
+  /** 当前筛选结果是否已全部选中 */
+  allSelected: boolean
+  /** 全选 / 取消全选当前筛选结果 */
+  onToggleSelectAll: () => void
   treePath?: string
   onClearTreePath: () => void
   query: string
@@ -53,6 +57,8 @@ export function Toolbar({
   onViewChange,
   multiSelect,
   onToggleMultiSelect,
+  allSelected,
+  onToggleSelectAll,
   treePath,
   onClearTreePath,
   query,
@@ -196,8 +202,21 @@ export function Toolbar({
               多选
             </Button>
           </Tooltip.Trigger>
-          <Tooltip.Content>多选模式（Ctrl / Cmd + 单击可随时加选）</Tooltip.Content>
+          <Tooltip.Content>
+            多选模式（Ctrl / Cmd + 单击追加，Shift + 单击选一段，Ctrl + A 全选）
+          </Tooltip.Content>
         </Tooltip>
+
+        {multiSelect ? (
+          <Button
+            size="sm"
+            variant="ghost"
+            onPress={onToggleSelectAll}
+            isDisabled={matchedCount === 0}
+          >
+            {allSelected ? '取消全选' : '全选'}
+          </Button>
+        ) : null}
       </div>
     </div>
   )

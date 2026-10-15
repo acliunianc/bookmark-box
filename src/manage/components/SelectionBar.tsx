@@ -9,7 +9,13 @@ interface SelectionBarProps {
   onCancel: () => void
 }
 
-export function SelectionBar({ count, onAddTags, onRemoveTags, onDelete, onCancel }: SelectionBarProps) {
+export function SelectionBar({
+  count,
+  onAddTags,
+  onRemoveTags,
+  onDelete,
+  onCancel,
+}: SelectionBarProps) {
   if (count === 0) return null
   return (
     <div className="pointer-events-none absolute inset-x-0 bottom-4 z-30 flex justify-center">

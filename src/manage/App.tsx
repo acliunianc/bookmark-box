@@ -147,6 +147,19 @@ export function ManageApp() {
   /* ------------------------------ 操作 ------------------------------ */
   const patchFilter = (patch: Partial<UiFilter>) => setFilter((prev) => ({ ...prev, ...patch }))
 
+  /**
+   * 范围选择的锚点：上一次「普通点击 / 方向键定位」所在的下标。
+   * Shift + 点击 / Shift + 方向键时从锚点算起，这样连续按 Shift 能稳定地扩选，
+   * 而不会因为「当前项」跟着移动导致范围反复收缩。
+   */
+  const anchorIndexRef = useRef(0)
+
+  /** 点击条目：既把高亮移过去，也把范围选择锚点挪过去 */
+  const activateItem = useCallback((index: number) => {
+    anchorIndexRef.current = index
+    setActiveIndex(index)
+  }, [])
+
   const toggleSelect = useCallback((id: string, additive: boolean) => {
     // Ctrl / Cmd 追加勾选时说明用户在挑多条，直接切到多选模式（勾选框随之出现）
     if (additive) setMultiSelect(true)
@@ -174,6 +187,39 @@ export function ManageApp() {
       return next
     })
   }, [])
+
+  /**
+   * Shift + 点击：把「锚点 → 该条」之间的书签并入选中集。
+   * 用并集而不是替换，方便连续 Shift 点几下拼出想要的组合。
+   */
+  const selectRange = useCallback(
+    (index: number) => {
+      setMultiSelect(true)
+      setSelectedIds((prev) => {
+        const next = new Set(prev)
+        const from = Math.min(anchorIndexRef.current, index)
+        const to = Math.max(anchorIndexRef.current, index)
+        for (const bookmark of visible.slice(from, to + 1)) next.add(bookmark.id)
+        return next
+      })
+      setActiveIndex(index)
+    },
+    [visible],
+  )
+
+  /** 全选当前筛选结果 */
+  const selectAll = useCallback(() => {
+    setMultiSelect(true)
+    setSelectedIds(new Set(visible.map((bookmark) => bookmark.id)))
+  }, [visible])
+
+  /** 当前筛选结果是否已全部选中（用于「全选 / 取消全选」按钮的文案） */
+  const allSelected = visible.length > 0 && visible.every((bookmark) => selectedIds.has(bookmark.id))
+
+  const toggleSelectAll = useCallback(() => {
+    if (allSelected) setSelectedIds(new Set())
+    else selectAll()
+  }, [allSelected, selectAll])
 
   /** 打开书签：统一在新标签页打开，管理页保持原地不动 */
   const openBookmark = useCallback(
@@ -375,14 +421,37 @@ export function ManageApp() {
 
       if (typing) return
 
-      if (event.key === 'ArrowDown') {
+      // Ctrl / Cmd + A：全选当前筛选结果
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'a') {
         event.preventDefault()
-        setActiveIndex((prev) => Math.min(visible.length - 1, prev + 1))
+        if (allSelected) {
+          setSelectedIds(new Set())
+          setMultiSelect(false)
+        } else {
+          selectAll()
+        }
         return
       }
-      if (event.key === 'ArrowUp') {
+
+      if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
         event.preventDefault()
-        setActiveIndex((prev) => Math.max(0, prev - 1))
+        const delta = event.key === 'ArrowDown' ? 1 : -1
+        const next = Math.max(0, Math.min(visible.length - 1, activeIndex + delta))
+        if (event.shiftKey) {
+          // Shift + 方向键：从锚点一路扩选到新位置（锚点不动，连按可持续扩）
+          setMultiSelect(true)
+          setSelectedIds((prev) => {
+            const result = new Set(prev)
+            const from = Math.min(anchorIndexRef.current, next)
+            const to = Math.max(anchorIndexRef.current, next)
+            for (const bookmark of visible.slice(from, to + 1)) result.add(bookmark.id)
+            return result
+          })
+          setActiveIndex(next)
+          return
+        }
+        anchorIndexRef.current = next
+        setActiveIndex(next)
         return
       }
       if (event.key === 'Enter' && activeIndex >= 0) {
@@ -395,7 +464,15 @@ export function ManageApp() {
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [activeIndex, openBackground, openBookmark, selectedIds.size, visible])
+  }, [
+    activeIndex,
+    allSelected,
+    openBackground,
+    openBookmark,
+    selectAll,
+    selectedIds.size,
+    visible,
+  ])
 
   /* ------------------------------ 渲染 ------------------------------ */
   const tagChips = filter.tagIds
@@ -533,6 +610,8 @@ export function ManageApp() {
             onClearQuery={() => patchFilter({ query: '' })}
             matchedCount={visible.length}
             totalCount={store.bookmarks.length}
+            allSelected={allSelected}
+            onToggleSelectAll={toggleSelectAll}
           />
 
           {store.error ? (
@@ -562,7 +641,8 @@ export function ManageApp() {
               }
               onToggleSelect={toggleSelect}
               onSetSelected={setSelected}
-              onActivate={setActiveIndex}
+              onActivate={activateItem}
+              onRangeSelect={selectRange}
               onOpen={(bookmark) => void openBookmark(bookmark)}
               onOpenBackground={(bookmark) => void openBackground(bookmark)}
               onFilterByTag={(id) => patchFilter({ scope: 'all', tagIds: [id] })}

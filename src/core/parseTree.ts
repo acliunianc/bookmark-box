@@ -1,5 +1,5 @@
 import { hashPath } from '../shared/utils'
-import type { AutoTagMode, FolderNode, ParsedBookmark, ParsedFolder } from '../shared/types'
+import type { FolderMode, FolderNode, ParsedBookmark, ParsedFolder } from '../shared/types'
 
 /** 解析时创建的合成根节点名（它不是一个真实文件夹，自动生成标签时会跳过） */
 export const ROOT_FOLDER_NAME = '书签'
@@ -200,23 +200,6 @@ export function folderPathSegments(path: string): FolderPathSegment[] {
   return segments
 }
 
-/** 按导入策略挑出「要生成标签」的文件夹段：leaf 只取末级，ancestors 取全部 */
-function pickedSegments(path: string, mode: AutoTagMode): FolderPathSegment[] {
-  if (mode === 'none') return []
-  const segments = folderPathSegments(path)
-  return mode === 'leaf' ? segments.slice(-1) : segments
-}
-
-/**
- * 按导入策略从文件夹路径推导出要自动生成的标签名。
- * - `leaf`：只用末级文件夹名（如 `书签栏/开发工具/前端` → `前端`）
- * - `ancestors`：末级 + 所有祖先文件夹名（如 `书签栏/开发工具/前端` → `书签栏`、`开发工具`、`前端`）
- * 合成根节点 `书签` 不是真实文件夹，始终跳过。
- */
-export function tagNamesFromPath(path: string, mode: AutoTagMode): string[] {
-  return pickedSegments(path, mode).map((segment) => segment.name)
-}
-
 /** 单个书签的「标签 → 分组」推导结果 */
 export interface TagPlanEntry {
   /** 要生成 / 关联的标签名 */
@@ -226,31 +209,69 @@ export interface TagPlanEntry {
 }
 
 /**
+ * 文件夹路径 → 处理方式的映射（只有被显式改过的文件夹才需要出现在里面）。
+ * 用普通对象而不是 Map，因为它要跟着消息 JSON 往返（渲染层 → service worker）。
+ */
+export type FolderModeMap = Readonly<Record<string, FolderMode>>
+
+/** 取某个文件夹的处理方式，缺省视为「创建为标签」 */
+export function folderModeOf(folderModes: FolderModeMap, path: string): FolderMode {
+  return folderModes[path] ?? 'tag'
+}
+
+/**
+ * 该文件夹能否被设为「成组」。
+ *
+ * 「成组」的含义是：这个文件夹自己不生成标签，而是把它下面生成的标签归入同名分组，
+ * 所以它必须还有子文件夹（否则下面不可能有标签，成组没有意义）；另外分组只有一层，
+ * 祖先已经成组时它也不能再成组。`hasGroupAncestor` 由调用方按当前配置传入。
+ */
+export function canGroupFolder(node: FolderNode, hasGroupAncestor = false): boolean {
+  return node.children.length > 0 && !hasGroupAncestor
+}
+
+/** 某个处理方式对该文件夹是否可用（不可用时批量套用会跳过它） */
+export function folderModeSupported(
+  node: FolderNode,
+  mode: FolderMode,
+  hasGroupAncestor = false,
+): boolean {
+  if (mode === 'group') return canGroupFolder(node, hasGroupAncestor)
+  return true
+}
+
+/**
  * 导入时推导单个书签要生成的标签，以及每个标签归属的分组。
  *
- * `groupPaths` 里是用户在导入预览里选了「成组」的文件夹路径：
- * - 这些文件夹自身不生成标签，而是把其下（不含自身）生成的标签统一归入同名分组；
- * - 分组只有一层，所以某个文件夹的祖先已经成组时，它即使被列进 `groupPaths` 也不再生效
- *   （标签归到最近的那个成组祖先）。
+ * 路径上**每一层**文件夹都按各自的处理方式来：`folderModes` 是用户在导入预览里逐文件夹
+ * 设置的映射，缺省即 `tag`。所以默认情况下 `书签栏/开发工具/前端` 会得到三个标签
+ * （`#书签栏`、`#开发工具`、`#前端`），想去掉某一层就把那一层设成 `none`。
+ *
+ * - `tag`（默认）：该文件夹名生成一个标签；
+ * - `group`：该文件夹自身不生成标签，其下生成的标签统一归入同名分组，
+ *   分组只有一层，所以某段路径的祖先已经成组时，更靠下的 `group` 不再生效
+ *   （标签归到最近的那个成组祖先）；
+ * - `none`：这一层文件夹既不生成标签也不成组，直接忽略（不影响其它层）。
+ *
+ * 整体不生成标签时由调用方跳过本函数（或传 `enabled = false`）。
  */
 export function folderTagPlan(
   path: string,
-  mode: AutoTagMode,
-  groupPaths: Iterable<string> = [],
+  folderModes: FolderModeMap = {},
+  enabled = true,
 ): TagPlanEntry[] {
-  const groupSet = groupPaths instanceof Set ? groupPaths : new Set(groupPaths)
-  if (groupSet.size === 0) return tagNamesFromPath(path, mode).map((name) => ({ name }))
+  if (!enabled) return []
 
   const segments = folderPathSegments(path)
   const plan: TagPlanEntry[] = []
-  for (const segment of pickedSegments(path, mode)) {
-    // 成组的文件夹本身不生成标签
-    if (groupSet.has(segment.path)) continue
+  for (const segment of segments) {
+    // 「成组」与「不处理」的文件夹自身都不生成标签
+    if (folderModeOf(folderModes, segment.path) !== 'tag') continue
     let groupName: string | undefined
     for (const ancestor of segments) {
       if (ancestor.path === segment.path) break
       // 取最近的成组祖先（分组只有一层，更上层的会被覆盖）
-      if (groupSet.has(ancestor.path)) groupName = ancestor.name
+      if (folderModeOf(folderModes, ancestor.path) === 'group') groupName = ancestor.name
     }
     plan.push(groupName ? { name: segment.name, groupName } : { name: segment.name })
   }

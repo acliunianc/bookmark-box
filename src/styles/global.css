@@ -119,3 +119,22 @@ body {
 ::-webkit-scrollbar-track {
   background: transparent;
 }
+
+/*
+ * 勾选框 / 单选圈补一圈描边。
+ *
+ * 项目主题把 `--field-border` 设成了 transparent（输入框想要「无边框」观感），
+ * 副作用是**未选中**的勾选框/单选圈只剩一个白底方块，落在浅色卡片上完全看不见；
+ * 选中态是深色/主题色填充，反而很清楚，于是「看着像没有勾选框」。
+ * 这里只给未选中态补描边，选中/半选时交回组件自己的样式。
+ */
+.checkbox__control,
+.radio__control {
+  border: 1px solid color-mix(in oklab, var(--muted) 50%, transparent);
+}
+
+.checkbox:has(input:checked) .checkbox__control,
+.checkbox:has(input:indeterminate) .checkbox__control,
+.radio:has(input:checked) .radio__control {
+  border-color: transparent;
+}

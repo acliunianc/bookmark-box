@@ -106,8 +106,13 @@ export type SortKey = 'lastOpened' | 'created' | 'openCount' | 'title' | 'url'
 export type ViewMode = 'list' | 'grid'
 export type FilterLogic = 'AND' | 'OR'
 
-/** 导入时按文件夹路径自动生成标签的策略 */
-export type AutoTagMode = 'none' | 'leaf' | 'ancestors'
+/**
+ * 导入时单个文件夹的处理方式（在「是否生成标签」之上逐文件夹微调）：
+ * - `tag`：该文件夹名生成为标签（默认）
+ * - `group`：该文件夹名不生成标签，其下生成的标签归入同名分组
+ * - `none`：既不生成标签、也不成组，该层文件夹名直接忽略
+ */
+export type FolderMode = 'tag' | 'group' | 'none'
 
 /** 左侧固定入口 */
 export type VirtualScope = 'all' | 'recent' | 'untagged'

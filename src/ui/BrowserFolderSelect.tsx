@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { ListBox, Select } from '@heroui/react'
 import { send, type BrowserFolderInfo } from '../shared/messages'
 import type { BrowserFolder, BrowserFolderMode } from '../shared/types'
+import { SearchSelect, type SearchSelectOption } from './SearchSelect'
 
 const EMPTY: BrowserFolderInfo = { folders: [], auto: null }
 
@@ -50,6 +50,9 @@ interface BrowserPlacementSelectProps {
 /**
  * 浏览器书签落点选择：第一项是「自动（最顶层）」，其余是本机浏览器书签里的文件夹。
  * 选中文件夹即视为手动模式。
+ *
+ * 本机书签往往有几十上百个文件夹，所以用可搜索下拉：按文件夹名或完整路径过滤，
+ * 选中后输入框里回填完整路径，避免同名文件夹分不清。
  */
 export function BrowserPlacementSelect({
   folders,
@@ -64,44 +67,29 @@ export function BrowserPlacementSelect({
   const autoLabel = auto ? `自动 · 最顶层（${auto.path}）` : '自动 · 最顶层'
   const selectedKey = mode === 'auto' ? AUTO_KEY : folderId || null
 
+  const options: SearchSelectOption[] = [
+    { id: AUTO_KEY, label: autoLabel },
+    ...folders.map((folder) => ({
+      id: folder.id,
+      label: folder.name,
+      // 按完整路径搜索，同名文件夹可以靠父级路径区分
+      textValue: folder.path,
+      indent: folder.depth * 12,
+    })),
+  ]
+
   return (
-    <Select
+    <SearchSelect
       className={className}
-      variant="secondary"
       aria-label={ariaLabel}
-      placeholder="选择放置位置"
-      isDisabled={isDisabled}
-      selectedKey={selectedKey}
-      onSelectionChange={(key) => {
-        const value = key == null ? AUTO_KEY : String(key)
-        if (value === AUTO_KEY) onChange({ mode: 'auto', folderId: '' })
-        else onChange({ mode: 'manual', folderId: value })
+      value={selectedKey}
+      onChange={(id) => {
+        if (id === AUTO_KEY) onChange({ mode: 'auto', folderId: '' })
+        else onChange({ mode: 'manual', folderId: id })
       }}
-    >
-      <Select.Trigger>
-        <Select.Value />
-        <Select.Indicator />
-      </Select.Trigger>
-      <Select.Popover>
-        <ListBox>
-          <ListBox.Item id={AUTO_KEY} textValue={autoLabel}>
-            {autoLabel}
-            <ListBox.ItemIndicator />
-          </ListBox.Item>
-          {folders.map((folder) => (
-            <ListBox.Item key={folder.id} id={folder.id} textValue={folder.path}>
-              <span
-                className="truncate"
-                style={{ paddingLeft: folder.depth * 12 }}
-                title={folder.path}
-              >
-                {folder.name}
-              </span>
-              <ListBox.ItemIndicator />
-            </ListBox.Item>
-          ))}
-        </ListBox>
-      </Select.Popover>
-    </Select>
+      options={options}
+      placeholder="搜索文件夹，或选择自动"
+      isDisabled={isDisabled}
+    />
   )
 }

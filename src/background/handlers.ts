@@ -384,8 +384,8 @@ async function applyParsed(parsed: ApplyInput, options: TreeApplyOptions): Promi
   const byNormUrl = new Map(all.map((item) => [item.normUrl, item]))
   const settings = await db.getSettings()
 
-  /** 用户选为「成组」的文件夹路径 */
-  const groupPaths = new Set(options.groupPaths ?? [])
+  /** 用户逐文件夹设置的处理方式（tag / group / none） */
+  const folderModes = options.folderModes ?? {}
   let groups = await db.allGroups()
 
   let tags = [...existingTags]
@@ -403,7 +403,7 @@ async function applyParsed(parsed: ApplyInput, options: TreeApplyOptions): Promi
     if (!normUrl) continue
 
     const importTagIds: string[] = []
-    for (const entry of folderTagPlan(item.path, options.autoTagMode, groupPaths)) {
+    for (const entry of folderTagPlan(item.path, folderModes, options.autoTag !== false)) {
       const created = createTag(tags, entry.name)
       tags = created.tags
       if (!created.existed) tagsCreated += 1

@@ -28,6 +28,8 @@ interface BookmarkListProps {
   onSetSelected: (id: string, selected: boolean) => void
   /** 点击条目时把「当前项」高亮移过去 */
   onActivate: (index: number) => void
+  /** Shift + 点击：从锚点成片选中到这一条 */
+  onRangeSelect: (index: number) => void
   /** 双击书签时调用：统一在新标签页打开 */
   onOpen: (bookmark: Bookmark) => void
   /** 中键单击：后台新标签打开 */
@@ -110,6 +112,7 @@ export function BookmarkList(props: BookmarkListProps) {
     onToggleSelect,
     onSetSelected,
     onActivate,
+    onRangeSelect,
     onOpen,
     onOpenBackground,
     onFilterByTag,
@@ -260,6 +263,7 @@ export function BookmarkList(props: BookmarkListProps) {
                     onToggleSelect={onToggleSelect}
                     onSetSelected={onSetSelected}
                     onActivate={() => handleActivate(absoluteIndex)}
+                    onRangeSelect={() => onRangeSelect(absoluteIndex)}
                     onOpen={onOpen}
                     onOpenBackground={onOpenBackground}
                     tagFilter={tagFilter}
@@ -280,6 +284,7 @@ export function BookmarkList(props: BookmarkListProps) {
                     onToggleSelect={onToggleSelect}
                     onSetSelected={onSetSelected}
                     onActivate={() => handleActivate(absoluteIndex)}
+                    onRangeSelect={() => onRangeSelect(absoluteIndex)}
                     onOpen={onOpen}
                     onOpenBackground={onOpenBackground}
                     tagFilter={tagFilter}
@@ -312,6 +317,8 @@ interface ItemProps {
   onOpenBackground: (bookmark: Bookmark) => void
   /** 单击标签（延后一拍生效） */
   tagFilter: TagFilterScheduler
+  /** Shift + 点击：从锚点成片选中到这一条 */
+  onRangeSelect: () => void
   onEditTags: (bookmark: Bookmark) => void
   onDelete: (bookmark: Bookmark) => void
 }
@@ -535,6 +542,7 @@ const BookmarkRow = ({
   onToggleSelect,
   onSetSelected,
   onActivate,
+  onRangeSelect,
   onOpen,
   onOpenBackground,
   tagFilter,
@@ -559,6 +567,11 @@ const BookmarkRow = ({
       draggable
       onDragStart={(event) => onDragStart(event, bookmark)}
       onClick={(event) => {
+        // Shift + 点击：从锚点成片选中到这一条（不改变锚点，便于继续扩选）
+        if (event.shiftKey) {
+          onRangeSelect()
+          return
+        }
         onActivate()
         // 多选模式：单击整行切换勾选；按住 Ctrl / Cmd 时追加勾选
         if (event.ctrlKey || event.metaKey) {
@@ -659,6 +672,7 @@ const BookmarkCard = ({
   onDragStart,
   onToggleSelect,
   onActivate,
+  onRangeSelect,
   onOpen,
   onOpenBackground,
   tagFilter,
@@ -670,6 +684,11 @@ const BookmarkCard = ({
       draggable
       onDragStart={(event) => onDragStart(event, bookmark)}
       onClick={(event) => {
+        // Shift + 点击：从锚点成片选中到这一条（不改变锚点，便于继续扩选）
+        if (event.shiftKey) {
+          onRangeSelect()
+          return
+        }
         onActivate()
         // 多选模式：单击整块切换勾选；按住 Ctrl / Cmd 时追加勾选
         if (event.ctrlKey || event.metaKey) {

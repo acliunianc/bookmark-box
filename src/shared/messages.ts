@@ -3,9 +3,9 @@
 import type { ParsedItem } from '../core/parseTree'
 import type { BrowserFolderInfo, BrowserSyncResult } from '../core/browserBookmarks'
 import type {
-  AutoTagMode,
   Bookmark,
   BrowserFolderMode,
+  FolderMode,
   Settings,
   SnapshotRecord,
   Tag,
@@ -39,13 +39,17 @@ export interface BootstrapData {
 
 export interface TreeApplyOptions {
   conflict: 'keep' | 'overwrite'
-  /** 导入时按文件夹路径自动生成标签的策略 */
-  autoTagMode: AutoTagMode
   /**
-   * 被选为「成组」的文件夹路径：这些文件夹自身不生成标签，
-   * 其下生成的标签统一归入与该文件夹同名的分组（分组只有一层，不能嵌套）
+   * 是否按文件夹路径生成标签（默认 true）。
+   * 这是总开关：关掉后 `folderModes` 整体失效，一条标签都不会自动生成。
    */
-  groupPaths?: string[]
+  autoTag?: boolean
+  /**
+   * 逐文件夹的处理方式：`tag`（默认，生成同名标签）/ `group`（自身上下不生成标签，
+   * 其下生成的标签归入同名分组，分组只有一层，不能嵌套）/ `none`（既不生成标签也不成组）。
+   * 只记录被用户显式改过的文件夹，缺省即 `tag`。
+   */
+  folderModes?: Record<string, FolderMode>
 }
 
 export interface TreeApplyResult {

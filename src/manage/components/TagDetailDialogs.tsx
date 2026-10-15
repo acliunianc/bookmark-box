@@ -4,15 +4,13 @@ import {
   ColorSwatchPicker,
   Input,
   Label,
-  ListBox,
   Modal,
-  ScrollShadow,
-  Select,
   Separator,
   TextField,
 } from '@heroui/react'
 import { TAG_COLORS, UNGROUPED_KEY } from '../../shared/constants'
 import type { Tag, TagGroup } from '../../shared/types'
+import { SearchSelect, type SearchSelectOption } from '../../ui/SearchSelect'
 
 const UNGROUPED_LABEL = '未分组'
 const DEFAULT_COLOR: string = TAG_COLORS[0]
@@ -66,6 +64,31 @@ export function TagDetailDialog({
     [tags, tag?.id],
   )
 
+  /* 分组和合并目标都可能是几十上百项，用可搜索下拉，靠输入过滤而不是滚动翻找 */
+  const groupOptions = useMemo<SearchSelectOption[]>(
+    () => [
+      { id: UNGROUPED_KEY, label: UNGROUPED_LABEL },
+      ...groups.map((group) => ({
+        id: group.id,
+        label: group.name,
+        color: group.color,
+        shape: 'square' as const,
+      })),
+    ],
+    [groups],
+  )
+
+  const mergeOptions = useMemo<SearchSelectOption[]>(
+    () =>
+      mergeCandidates.map((item) => ({
+        id: item.id,
+        label: item.name,
+        color: item.color,
+        meta: item.useCount,
+      })),
+    [mergeCandidates],
+  )
+
   if (!tag) return null
 
   const run = async (task: () => Promise<void>) => {
@@ -115,76 +138,30 @@ export function TagDetailDialog({
                   </ColorSwatchPicker>
                 </div>
 
-                <Select
-                  variant="secondary"
+                <SearchSelect
                   aria-label="所属分组"
-                  selectedKey={groupId ?? UNGROUPED_KEY}
-                  onSelectionChange={(key) => setGroupId(key === UNGROUPED_KEY ? null : String(key))}
-                >
-                  <Label className="text-xs font-medium text-[var(--muted)]">所属分组</Label>
-                  <Select.Trigger>
-                    <Select.Value />
-                    <Select.Indicator />
-                  </Select.Trigger>
-                  <Select.Popover>
-                    <ListBox>
-                      <ListBox.Item id={UNGROUPED_KEY} textValue={UNGROUPED_LABEL}>
-                        {UNGROUPED_LABEL}
-                        <ListBox.ItemIndicator />
-                      </ListBox.Item>
-                      {groups.map((group) => (
-                        <ListBox.Item key={group.id} id={group.id} textValue={group.name}>
-                          <span className="flex items-center gap-2">
-                            <span
-                              className="size-2 shrink-0 rounded-sm"
-                              style={{ backgroundColor: group.color }}
-                            />
-                            {group.name}
-                          </span>
-                          <ListBox.ItemIndicator />
-                        </ListBox.Item>
-                      ))}
-                    </ListBox>
-                  </Select.Popover>
-                </Select>
+                  className="w-full"
+                  label="所属分组"
+                  value={groupId ?? UNGROUPED_KEY}
+                  onChange={(id) => setGroupId(id === UNGROUPED_KEY ? null : id)}
+                  options={groupOptions}
+                  placeholder="输入关键字搜索分组"
+                />
 
                 <Separator />
 
                 <div className="flex flex-col gap-2">
                   <span className="text-xs font-medium text-[var(--muted)]">合并到其他标签</span>
                   <div className="flex items-center gap-2">
-                    <Select
-                      className="flex-1"
-                      variant="secondary"
+                    <SearchSelect
                       aria-label="合并目标"
-                      placeholder="选择目标标签"
-                      selectedKey={mergeTarget}
-                      onSelectionChange={(key) => setMergeTarget(key == null ? null : String(key))}
-                    >
-                      <Select.Trigger>
-                        <Select.Value />
-                        <Select.Indicator />
-                      </Select.Trigger>
-                      <Select.Popover>
-                        <ScrollShadow className="max-h-64">
-                          <ListBox>
-                            {mergeCandidates.map((item) => (
-                              <ListBox.Item key={item.id} id={item.id} textValue={item.name}>
-                                <span className="flex items-center gap-2">
-                                  <span
-                                    className="size-2 shrink-0 rounded-full"
-                                    style={{ backgroundColor: item.color }}
-                                  />
-                                  {item.name}
-                                  <span className="text-xs text-[var(--muted)]">{item.useCount}</span>
-                                </span>
-                                <ListBox.ItemIndicator />
-                              </ListBox.Item>
-                            ))}
-                          </ListBox>
-                        </ScrollShadow>
-                      </Select.Popover>
-                    </Select>
+                      className="flex-1"
+                      value={mergeTarget}
+                      onChange={setMergeTarget}
+                      options={mergeOptions}
+                      placeholder="搜索并选择目标标签"
+                      isDisabled={busy}
+                    />
                     <Button
                       variant="danger-soft"
                       isDisabled={busy || !mergeTarget}
