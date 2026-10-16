@@ -38,8 +38,17 @@ chrome.runtime.onMessage.addListener((message: IncomingMessage, _sender, sendRes
   return true
 })
 
-export function openManagePage(): void {
-  void chrome.tabs.create({ url: chrome.runtime.getURL('manage.html') })
+export async function openManagePage(): Promise<void> {
+  const url = chrome.runtime.getURL('manage.html')
+  const [existing] = await chrome.tabs.query({ url })
+  if (existing?.id != null) {
+    await chrome.tabs.update(existing.id, { active: true })
+    if (existing.windowId != null) {
+      await chrome.windows.update(existing.windowId, { focused: true })
+    }
+    return
+  }
+  await chrome.tabs.create({ url })
 }
 
 async function flashBadge(text: string, color: string): Promise<void> {
@@ -91,6 +100,7 @@ chrome.commands.onCommand.addListener(async (command) => {
       return
     }
     if (command === 'instant-save') await instantSave()
+    if (command === 'open-manage') await openManagePage()
   } catch (error) {
     console.error('[BookmarkBox] 快捷键处理失败：', command, error)
   }

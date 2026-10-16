@@ -37,5 +37,9 @@ export default defineManifest({
     'instant-save': {
       description: '以上次使用的标签组合极速保存当前页（需在 chrome://extensions/shortcuts 自行绑定按键）',
     },
+    'open-manage': {
+      suggested_key: { default: 'Alt+Shift+M', mac: 'Alt+Shift+M' },
+      description: '打开 BookmarkBox 管理页',
+    },
   },
 })

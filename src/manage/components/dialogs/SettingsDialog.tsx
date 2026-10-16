@@ -40,6 +40,7 @@ export function SettingsDialog({
   const [confirmPurge, setConfirmPurge] = useState(false)
   const [confirmClear, setConfirmClear] = useState(false)
   const [clearing, setClearing] = useState(false)
+  const [shortcuts, setShortcuts] = useState<chrome.commands.Command[]>([])
   /* 打开设置时才去读本机浏览器书签的文件夹（用于选放置位置） */
   const browserFolders = useBrowserFolders(open)
 
@@ -56,7 +57,9 @@ export function SettingsDialog({
   }
 
   useEffect(() => {
-    if (open) void loadSnapshots()
+    if (!open) return
+    void loadSnapshots()
+    void chrome.commands.getAll().then(setShortcuts).catch(() => setShortcuts([]))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
 
@@ -108,6 +111,30 @@ export function SettingsDialog({
         }
       >
         <div className="flex flex-col gap-6">
+          <section className="flex flex-col gap-2">
+            <h3 className="text-sm font-medium">快捷键</h3>
+            <ul className="rounded-[var(--radius)] border border-[var(--border)]">
+              {shortcuts.length === 0 ? (
+                <li className="px-3 py-2 text-xs text-[var(--muted)]">当前环境读不到快捷键</li>
+              ) : (
+                shortcuts.map((command) => (
+                  <li
+                    key={command.name}
+                    className="flex items-center gap-3 border-b border-[var(--separator)] px-3 py-2 text-xs last:border-b-0"
+                  >
+                    <span className="min-w-0 flex-1">{command.description || command.name}</span>
+                    <span className="shrink-0 rounded bg-[var(--default)] px-1.5 py-0.5 tabular-nums">
+                      {command.shortcut || '未设置'}
+                    </span>
+                  </li>
+                ))
+              )}
+            </ul>
+            <p className="text-xs text-[var(--muted)]">
+              在地址栏打开 chrome://extensions/shortcuts，找到 BookmarkBox 即可修改。默认「打开管理页」是 Alt+Shift+M；若与浏览器快捷键冲突，需要在该页重新指定。
+            </p>
+          </section>
+
           <section className="flex flex-col gap-3">
             <h3 className="text-sm font-medium">收藏与检索</h3>
 
