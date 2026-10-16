@@ -120,12 +120,12 @@ export function TagPicker({
         </div>
 
         {showList ? (
-          <div className="absolute top-full z-50 mt-1 w-full">
+          <div className="absolute top-full z-50 mt-1 w-full overflow-hidden rounded-2xl border border-[var(--separator)] bg-[var(--overlay)] text-[var(--overlay-foreground)] shadow-[var(--overlay-shadow)]">
             <ListBox
               aria-label="标签建议"
               selectionMode="none"
               onAction={onAction}
-              className="max-h-56 overflow-y-auto shadow-xl"
+              className="max-h-56 overflow-y-auto bg-[var(--overlay)]"
             >
               {suggestions.map((tag) => (
                 <ListBox.Item key={tag.id} id={tag.id} textValue={tag.name}>
