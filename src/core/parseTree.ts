@@ -219,12 +219,27 @@ export function folderModeOf(folderModes: FolderModeMap, path: string): FolderMo
   return folderModes[path] ?? 'tag'
 }
 
+/** `group` 与 `both` 都会占用这一层分组名（分组只有一层，不能再嵌套） */
+export function isGroupingMode(mode: FolderMode): boolean {
+  return mode === 'group' || mode === 'both'
+}
+
+/** 路径上是否已有祖先占用了分组（不含自身） */
+export function hasGroupingAncestor(path: string, folderModes: FolderModeMap): boolean {
+  const segments = path.split('/')
+  let acc = ''
+  for (let index = 0; index < segments.length - 1; index += 1) {
+    acc = acc ? `${acc}/${segments[index]}` : segments[index]
+    if (isGroupingMode(folderModeOf(folderModes, acc))) return true
+  }
+  return false
+}
+
 /**
- * 该文件夹能否被设为「成组」。
+ * 该文件夹能否被设为「分组」或「成组+标签」。
  *
- * 「成组」的含义是：这个文件夹自己不生成标签，而是把它下面生成的标签归入同名分组，
- * 所以它必须还有子文件夹（否则下面不可能有标签，成组没有意义）；另外分组只有一层，
- * 祖先已经成组时它也不能再成组。`hasGroupAncestor` 由调用方按当前配置传入。
+ * 这两种方式都要把它下面生成的标签归入同名分组，所以必须还有子文件夹；
+ * 分组只有一层，祖先已经成组时它也不能再成组。
  */
 export function canGroupFolder(node: FolderNode, hasGroupAncestor = false): boolean {
   return node.children.length > 0 && !hasGroupAncestor
@@ -236,7 +251,7 @@ export function folderModeSupported(
   mode: FolderMode,
   hasGroupAncestor = false,
 ): boolean {
-  if (mode === 'group') return canGroupFolder(node, hasGroupAncestor)
+  if (isGroupingMode(mode)) return canGroupFolder(node, hasGroupAncestor)
   return true
 }
 
@@ -248,8 +263,10 @@ export function folderModeSupported(
  * （`#书签栏`、`#开发工具`、`#前端`），想去掉某一层就把那一层设成 `none`。
  *
  * - `tag`（默认）：该文件夹名生成一个标签；
- * - `group`：该文件夹自身不生成标签，其下生成的标签统一归入同名分组，
- *   分组只有一层，所以某段路径的祖先已经成组时，更靠下的 `group` 不再生效
+ * - `group`：该文件夹自身不生成标签，其下生成的标签统一归入同名分组；
+ * - `both`：既生成同名标签，又把这个标签和其下标签归入同名分组。
+ *   文件夹里既有子文件夹、又有直接放着的链接时用它，那些链接也会带上这一层的标签；
+ * - 分组只有一层，祖先已经成组时，更靠下的 `group` / `both` 不再生效
  *   （标签归到最近的那个成组祖先）；
  * - `none`：这一层文件夹既不生成标签也不成组，直接忽略（不影响其它层）。
  *
@@ -265,14 +282,17 @@ export function folderTagPlan(
   const segments = folderPathSegments(path)
   const plan: TagPlanEntry[] = []
   for (const segment of segments) {
-    // 「成组」与「不处理」的文件夹自身都不生成标签
-    if (folderModeOf(folderModes, segment.path) !== 'tag') continue
+    const mode = folderModeOf(folderModes, segment.path)
+    // 「分组」与「不处理」自身都不生成标签；「成组+标签」会生成
+    if (mode !== 'tag' && mode !== 'both') continue
     let groupName: string | undefined
     for (const ancestor of segments) {
       if (ancestor.path === segment.path) break
       // 取最近的成组祖先（分组只有一层，更上层的会被覆盖）
-      if (folderModeOf(folderModes, ancestor.path) === 'group') groupName = ancestor.name
+      if (isGroupingMode(folderModeOf(folderModes, ancestor.path))) groupName = ancestor.name
     }
+    // 自身是「成组+标签」时，这个标签也归进同名分组
+    if (!groupName && mode === 'both') groupName = segment.name
     plan.push(groupName ? { name: segment.name, groupName } : { name: segment.name })
   }
   return plan

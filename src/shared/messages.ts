@@ -45,8 +45,9 @@ export interface TreeApplyOptions {
    */
   autoTag?: boolean
   /**
-   * 逐文件夹的处理方式：`tag`（默认，生成同名标签）/ `group`（自身上下不生成标签，
-   * 其下生成的标签归入同名分组，分组只有一层，不能嵌套）/ `none`（既不生成标签也不成组）。
+   * 逐文件夹的处理方式：`tag`（默认，生成同名标签）/ `group`（自身不生成标签，
+   * 其下生成的标签归入同名分组）/ `both`（生成同名标签，并和其下标签一起归入同名分组）/
+   * `none`（既不生成标签也不成组）。分组只有一层，不能嵌套。
    * 只记录被用户显式改过的文件夹，缺省即 `tag`。
    */
   folderModes?: Record<string, FolderMode>

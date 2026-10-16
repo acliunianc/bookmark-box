@@ -191,7 +191,7 @@ export function ImportDialog({ open, bookmarks, settings, onClose, onImported }:
       onClose={close}
       title="导入书签"
       description="解析出的文件夹树会整体替换旧快照（只读），书签按 URL 去重合并进书签池"
-      width={600}
+      width={680}
       footer={
         <>
           {step === 'preview' ? (

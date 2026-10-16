@@ -384,7 +384,7 @@ async function applyParsed(parsed: ApplyInput, options: TreeApplyOptions): Promi
   const byNormUrl = new Map(all.map((item) => [item.normUrl, item]))
   const settings = await db.getSettings()
 
-  /** 用户逐文件夹设置的处理方式（tag / group / none） */
+  /** 用户逐文件夹设置的处理方式（tag / group / both / none） */
   const folderModes = options.folderModes ?? {}
   let groups = await db.allGroups()
 

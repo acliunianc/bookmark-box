@@ -110,9 +110,11 @@ export type FilterLogic = 'AND' | 'OR'
  * 导入时单个文件夹的处理方式（在「是否生成标签」之上逐文件夹微调）：
  * - `tag`：该文件夹名生成为标签（默认）
  * - `group`：该文件夹名不生成标签，其下生成的标签归入同名分组
+ * - `both`：既生成同名标签，又把该标签和其下标签归入同名分组
+ *   （文件夹里既有子文件夹、又有直接放着的链接时用它）
  * - `none`：既不生成标签、也不成组，该层文件夹名直接忽略
  */
-export type FolderMode = 'tag' | 'group' | 'none'
+export type FolderMode = 'tag' | 'group' | 'both' | 'none'
 
 /** 左侧固定入口 */
 export type VirtualScope = 'all' | 'recent' | 'untagged'
