@@ -727,6 +727,10 @@ export const handlers = {
   'undo/last': async () => ({ undo: ((await db.latestSnapshot('undo'))?.payload as UndoPayload) ?? null }),
   'undo/apply': handleUndoApply,
   'settings/update': handleSettingsUpdate,
+  'data/clear': async () => {
+    await db.clearUserData()
+    return { ok: true as const }
+  },
   'backup/import': handleBackupImport,
   'snapshot/list': async () => ({ snapshots: await db.listSnapshots() }),
   'snapshot/restore': async (payload: { id: number }) => handleSnapshotRestore(payload.id),

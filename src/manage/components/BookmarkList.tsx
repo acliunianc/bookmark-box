@@ -7,10 +7,11 @@ import {
 } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import type { Bookmark, Tag, ViewMode } from '../../shared/types'
-import { displayDomain, faviconUrl, highlightSegments, relativeTime } from '../../shared/utils'
+import { displayDomain, highlightSegments, relativeTime } from '../../shared/utils'
 import { Button, Checkbox, EmptyState, Tooltip } from '@heroui/react'
 import type { ReactNode } from 'react'
 import { cn } from '../../ui/cn'
+import { Favicon } from '../../ui/Favicon'
 import { TagChip } from '../../ui/TagChip'
 import { IconEdit, IconExternal, IconTrash } from '../../ui/icons'
 
@@ -19,12 +20,10 @@ interface BookmarkListProps {
   tagById: Map<string, Tag>
   keywords: string[]
   selectedIds: Set<string>
-  multiSelect: boolean
   view: ViewMode
   activeIndex: number
   emptyHint?: string
-  onToggleSelect: (id: string, additive: boolean) => void
-  /** 勾选框直接切换某一条的选中态（进入多选模式） */
+  /** 勾选框直接切换某一条的选中态 */
   onSetSelected: (id: string, selected: boolean) => void
   /** 点击条目时把「当前项」高亮移过去 */
   onActivate: (index: number) => void
@@ -83,6 +82,10 @@ function useTagFilterScheduler(onFilterByTag: (tagId: string) => void): TagFilte
 
 const LIST_MIN_ROW_HEIGHT = 60
 const GRID_CARD_MIN_HEIGHT = 132
+
+function estimateGridRow(): number {
+  return GRID_CARD_MIN_HEIGHT
+}
 const TAG_LINE_HEIGHT = 19
 const COLUMN_GAP = 12
 const GRID_CARD_WIDTH = 248
@@ -105,11 +108,9 @@ export function BookmarkList(props: BookmarkListProps) {
     tagById,
     keywords,
     selectedIds,
-    multiSelect,
     view,
     activeIndex,
     emptyHint,
-    onToggleSelect,
     onSetSelected,
     onActivate,
     onRangeSelect,
@@ -172,16 +173,19 @@ export function BookmarkList(props: BookmarkListProps) {
   const rowVirtualizer = useVirtualizer({
     count: rowCount,
     getScrollElement: () => containerRef.current,
-    estimateSize: estimateRowHeight,
-    overscan: 8,
+    estimateSize: view === 'grid' ? estimateGridRow : estimateRowHeight,
+    // 网格一行多张卡片，多预渲染几行会在滚动时成批挂载，手感发粘
+    overscan: view === 'grid' ? 2 : 8,
     // 网格视图行与行之间需要间距；列表视图靠行自身高度即可
     gap: view === 'grid' ? COLUMN_GAP : 0,
     // 用行首书签 id 作为 key，列表内容变化（筛选/排序）后旧的高度缓存自然失效
     getItemKey: (index) => items[index * perRow]?.id ?? `row-${index}`,
   })
 
-  // 视图 / 每行列数 / 容器宽度变化后，行高（标签换行位置）会变，实测缓存必须失效
+  // 列表行高随标签换行变化，宽度变了要清掉实测缓存。
+  // 网格行高固定，滚动时再 measure 会把整表重排，造成卡顿。
   useEffect(() => {
+    if (view !== 'list') return
     rowVirtualizer.measure()
   }, [rowVirtualizer, view, perRow, viewportWidth])
 
@@ -237,12 +241,16 @@ export function BookmarkList(props: BookmarkListProps) {
             <div
               key={virtualRow.key}
               data-index={virtualRow.index}
-              ref={rowVirtualizer.measureElement}
+              ref={view === 'list' ? rowVirtualizer.measureElement : undefined}
               className={cn('absolute top-0 left-0 w-full', view === 'grid' && 'grid')}
               style={{
                 transform: `translateY(${virtualRow.start}px)`,
                 ...(view === 'grid'
-                  ? { gridTemplateColumns: `repeat(${perRow}, minmax(0, 1fr))`, columnGap: COLUMN_GAP }
+                  ? {
+                      height: GRID_CARD_MIN_HEIGHT,
+                      gridTemplateColumns: `repeat(${perRow}, minmax(0, 1fr))`,
+                      columnGap: COLUMN_GAP,
+                    }
                   : undefined),
               }}
             >
@@ -258,9 +266,7 @@ export function BookmarkList(props: BookmarkListProps) {
                     keywords={keywords}
                     selected={selected}
                     active={active}
-                    selectOnClick={multiSelect}
                     onDragStart={handleDragStart}
-                    onToggleSelect={onToggleSelect}
                     onSetSelected={onSetSelected}
                     onActivate={() => handleActivate(absoluteIndex)}
                     onRangeSelect={() => onRangeSelect(absoluteIndex)}
@@ -278,10 +284,7 @@ export function BookmarkList(props: BookmarkListProps) {
                     keywords={keywords}
                     selected={selected}
                     active={active}
-                    showCheckbox={multiSelect || selectedIds.size > 0}
-                    selectOnClick={multiSelect}
                     onDragStart={handleDragStart}
-                    onToggleSelect={onToggleSelect}
                     onSetSelected={onSetSelected}
                     onActivate={() => handleActivate(absoluteIndex)}
                     onRangeSelect={() => onRangeSelect(absoluteIndex)}
@@ -307,10 +310,7 @@ interface ItemProps {
   keywords: string[]
   selected: boolean
   active: boolean
-  /** 多选模式下单击整行即切换勾选，双击不再跳转 */
-  selectOnClick: boolean
   onDragStart: (event: DragEvent, bookmark: Bookmark) => void
-  onToggleSelect: (id: string, additive: boolean) => void
   onSetSelected: (id: string, selected: boolean) => void
   onActivate: () => void
   onOpen: (bookmark: Bookmark) => void
@@ -366,76 +366,44 @@ function TagChips({
   )
 }
 
+/** 网格标签行可用宽度：卡片内容区大约这么宽，用估算避免滚动时读 DOM */
+const GRID_TAG_ROW_WIDTH = GRID_CARD_WIDTH - 36
+
+function gridVisibleTagCount(bookmark: Bookmark, tagById: Map<string, Tag>): number {
+  let used = 0
+  let count = 0
+  for (const id of bookmark.tagIds) {
+    const name = tagById.get(id)?.name ?? id
+    const width = estimateTextWidth(name, 11) + 28
+    const reserve = count + 1 < bookmark.tagIds.length ? MORE_CHIP_WIDTH + CHIP_GAP : 0
+    if (count > 0 && used + width + reserve > GRID_TAG_ROW_WIDTH) break
+    used += width + CHIP_GAP
+    count += 1
+  }
+  return count
+}
+
 /**
- * 网格卡片底部的标签行：固定单行，放不下的折叠为「+N」，鼠标移入可看到剩余标签。
- * 所有芯片都会渲染出来量一次真实宽度（被折叠的用 absolute + invisible 移出流），
- * 因此宽度是实测值而不是估算值，换行裁剪不会出现半截。
+ * 网格卡片底部的标签行：固定单行，放不下的折叠为「+N」。
+ * 只渲染看得见的芯片，宽度按字数估算，滚动时不再为每张卡片挂 ResizeObserver。
  */
 function CardTagRow({
   bookmark,
   tagById,
   tagFilter,
 }: Pick<ItemProps, 'bookmark' | 'tagById' | 'tagFilter'>) {
-  const rowRef = useRef<HTMLSpanElement>(null)
-  const [visibleCount, setVisibleCount] = useState(bookmark.tagIds.length)
-
-  const recompute = useCallback(() => {
-    const row = rowRef.current
-    if (!row) return
-    const available = row.clientWidth
-    if (available <= 0) return
-    const widths = Array.from(row.querySelectorAll<HTMLElement>('[data-tag-chip]')).map(
-      (chip) => chip.offsetWidth + CHIP_GAP,
-    )
-    if (widths.length === 0) return
-
-    const total = widths.reduce((sum, width) => sum + width, 0)
-    if (total <= available + CHIP_GAP) {
-      setVisibleCount(widths.length)
-      return
-    }
-    // 放不下：给「+N」预留位置后再往前收
-    const budget = available + CHIP_GAP - MORE_CHIP_WIDTH - CHIP_GAP
-    let count = widths.length
-    let used = total
-    while (count > 0 && used > budget) {
-      count -= 1
-      used -= widths[count]
-    }
-    setVisibleCount(count)
-  }, [])
-
-  useEffect(() => {
-    recompute()
-    const row = rowRef.current
-    if (!row) return undefined
-    const observer = new ResizeObserver(recompute)
-    observer.observe(row)
-    return () => observer.disconnect()
-  }, [recompute, bookmark.tagIds])
-
   if (bookmark.tagIds.length === 0) return null
 
+  const visibleCount = gridVisibleTagCount(bookmark, tagById)
   const hiddenIds = bookmark.tagIds.slice(visibleCount)
+  const visibleIds = bookmark.tagIds.slice(0, visibleCount)
 
   return (
-    <span
-      ref={rowRef}
-      className="relative flex min-w-0 flex-1 flex-nowrap items-center gap-1 overflow-hidden"
-    >
-      {bookmark.tagIds.map((id, index) => {
+    <span className="relative flex min-w-0 flex-1 flex-nowrap items-center gap-1 overflow-hidden">
+      {visibleIds.map((id) => {
         const tag = tagById.get(id)
-        const hidden = index >= visibleCount
         return (
-          <span
-            key={id}
-            data-tag-chip
-            className={cn(
-              'shrink-0',
-              // 被折叠的芯片仍在 DOM 里（用于实测宽度），但要移出布局与交互
-              hidden && 'pointer-events-none invisible absolute w-max',
-            )}
-          >
+          <span key={id} className="shrink-0">
             <TagChip
               name={tag?.name ?? id}
               color={tag?.color}
@@ -516,18 +484,9 @@ function IconAction({
   )
 }
 
-function Favicon({ url }: { url: string }) {
-  return (
-    <img
-      src={faviconUrl(url, 32)}
-      alt=""
-      loading="lazy"
-      className="size-5 shrink-0 rounded"
-      onError={(event) => {
-        event.currentTarget.style.visibility = 'hidden'
-      }}
-    />
-  )
+/** 点在勾选框、按钮或行内标签上时，不把 Ctrl+点击当成「打开书签」 */
+function isInteractiveTarget(target: EventTarget | null): boolean {
+  return target instanceof Element && Boolean(target.closest('button, a, input, label, [data-tag-chip]'))
 }
 
 const BookmarkRow = ({
@@ -536,10 +495,7 @@ const BookmarkRow = ({
   keywords,
   selected,
   active,
-  showCheckbox,
-  selectOnClick,
   onDragStart,
-  onToggleSelect,
   onSetSelected,
   onActivate,
   onRangeSelect,
@@ -548,7 +504,7 @@ const BookmarkRow = ({
   tagFilter,
   onEditTags,
   onDelete,
-}: ItemProps & { showCheckbox: boolean }) => {
+}: ItemProps) => {
   /** 连点两下勾选框时，第二次 change 忽略掉，避免「选了又取消」 */
   const lastToggleRef = useRef(0)
   /** 最近一次点到勾选框的时间：双击事件可能先于多选状态生效，这里兜一层 */
@@ -572,20 +528,20 @@ const BookmarkRow = ({
           onRangeSelect()
           return
         }
-        onActivate()
-        // 多选模式：单击整行切换勾选；按住 Ctrl / Cmd 时追加勾选
-        if (event.ctrlKey || event.metaKey) {
-          onToggleSelect(bookmark.id, true)
+        // Ctrl / ⌘ + 左键：直接在新标签页打开，不参与勾选
+        if ((event.ctrlKey || event.metaKey) && !isInteractiveTarget(event.target)) {
+          event.preventDefault()
+          onOpen(bookmark)
           return
         }
-        if (selectOnClick) onToggleSelect(bookmark.id, false)
+        onActivate()
       }}
       onDoubleClick={() => {
         // 双击时取消尚未生效的「标签筛选」，确保这次双击一定是打开书签
         tagFilter.cancel()
-        // 双击落在勾选框上时不要打开页面（第二次点击可能晚于多选状态生效）
+        // 双击落在勾选框上时不要打开页面
         if (Date.now() - checkboxTouchedRef.current < 400) return
-        if (!selectOnClick) onOpen(bookmark)
+        onOpen(bookmark)
       }}
       onAuxClick={(event) => {
         if (event.button === 1) {
@@ -599,16 +555,15 @@ const BookmarkRow = ({
         selected && 'bg-[var(--accent)]/20',
       )}
     >
-      {showCheckbox ? (
-        <span
-          className="shrink-0"
-          onClick={(event) => {
-            checkboxTouchedRef.current = Date.now()
-            event.stopPropagation()
-          }}
-          // 连点两下勾选框不该冒泡到整行的双击「打开」逻辑
-          onDoubleClick={(event) => event.stopPropagation()}
-        >
+      <span
+        className="shrink-0"
+        onClick={(event) => {
+          checkboxTouchedRef.current = Date.now()
+          event.stopPropagation()
+        }}
+        // 连点两下勾选框不该冒泡到整行的双击「打开」逻辑
+        onDoubleClick={(event) => event.stopPropagation()}
+      >
           {/* 必须带上 Checkbox.Content：没有它时组件不会渲染可点击的 label/input，点了没反应 */}
           <Checkbox
             aria-label={`选择 ${bookmark.title}`}
@@ -621,8 +576,7 @@ const BookmarkRow = ({
               </Checkbox.Control>
             </Checkbox.Content>
           </Checkbox>
-        </span>
-      ) : null}
+      </span>
 
       <Favicon url={bookmark.url} />
 
@@ -668,9 +622,8 @@ const BookmarkCard = ({
   keywords,
   selected,
   active,
-  selectOnClick,
   onDragStart,
-  onToggleSelect,
+  onSetSelected,
   onActivate,
   onRangeSelect,
   onOpen,
@@ -679,6 +632,16 @@ const BookmarkCard = ({
   onEditTags,
   onDelete,
 }: ItemProps) => {
+  const lastToggleRef = useRef(0)
+  const checkboxTouchedRef = useRef(0)
+  const handleCheckboxChange = (value: boolean) => {
+    const now = Date.now()
+    const isRapidRepeat = now - lastToggleRef.current < 350
+    lastToggleRef.current = now
+    if (isRapidRepeat) return
+    onSetSelected(bookmark.id, value)
+  }
+
   return (
     <div
       draggable
@@ -689,18 +652,19 @@ const BookmarkCard = ({
           onRangeSelect()
           return
         }
-        onActivate()
-        // 多选模式：单击整块切换勾选；按住 Ctrl / Cmd 时追加勾选
-        if (event.ctrlKey || event.metaKey) {
-          onToggleSelect(bookmark.id, true)
+        // Ctrl / ⌘ + 左键：直接在新标签页打开，不参与勾选
+        if ((event.ctrlKey || event.metaKey) && !isInteractiveTarget(event.target)) {
+          event.preventDefault()
+          onOpen(bookmark)
           return
         }
-        if (selectOnClick) onToggleSelect(bookmark.id, false)
+        onActivate()
       }}
       onDoubleClick={() => {
         // 双击时取消尚未生效的「标签筛选」，确保这次双击一定是打开书签
         tagFilter.cancel()
-        if (!selectOnClick) onOpen(bookmark)
+        if (Date.now() - checkboxTouchedRef.current < 400) return
+        onOpen(bookmark)
       }}
       onAuxClick={(event) => {
         if (event.button === 1) {
@@ -709,12 +673,32 @@ const BookmarkCard = ({
         }
       }}
       className={cn(
-        'group flex min-h-[132px] cursor-pointer flex-col gap-2 rounded-[var(--radius)] border border-[var(--border)] p-3 transition',
+        'group flex h-[132px] cursor-pointer flex-col gap-2 overflow-hidden rounded-[var(--radius)] border border-[var(--border)] p-3 transition',
         active ? 'border-[var(--accent)] bg-[var(--accent)]/10' : 'hover:bg-[var(--default)]',
         selected && 'bg-[var(--accent)]/20',
       )}
     >
       <div className="flex items-start gap-2">
+        <span
+          className="shrink-0"
+          onClick={(event) => {
+            checkboxTouchedRef.current = Date.now()
+            event.stopPropagation()
+          }}
+          onDoubleClick={(event) => event.stopPropagation()}
+        >
+          <Checkbox
+            aria-label={`选择 ${bookmark.title}`}
+            isSelected={selected}
+            onChange={handleCheckboxChange}
+          >
+            <Checkbox.Content>
+              <Checkbox.Control>
+                <Checkbox.Indicator />
+              </Checkbox.Control>
+            </Checkbox.Content>
+          </Checkbox>
+        </span>
         <Favicon url={bookmark.url} />
         <span className="line-clamp-3 flex-1 text-sm font-medium" title={bookmark.title}>
           <Highlighted text={bookmark.title} keywords={keywords} />

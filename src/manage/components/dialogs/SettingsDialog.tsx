@@ -15,6 +15,8 @@ interface SettingsDialogProps {
   onClose: () => void
   onUpdateSettings: (patch: Partial<Settings>) => Promise<void>
   onDataChanged: () => Promise<void>
+  /** 清空本地数据后：刷新并丢掉仍指向旧数据的筛选 / 选中态 */
+  onCleared: () => Promise<void>
 }
 
 const KIND_LABEL: Record<SnapshotRecord['kind'], string> = {
@@ -30,11 +32,14 @@ export function SettingsDialog({
   onClose,
   onUpdateSettings,
   onDataChanged,
+  onCleared,
 }: SettingsDialogProps) {
   const toast = useToast()
   const [snapshots, setSnapshots] = useState<SnapshotRecord[]>([])
   const [loading, setLoading] = useState(false)
   const [confirmPurge, setConfirmPurge] = useState(false)
+  const [confirmClear, setConfirmClear] = useState(false)
+  const [clearing, setClearing] = useState(false)
   /* 打开设置时才去读本机浏览器书签的文件夹（用于选放置位置） */
   const browserFolders = useBrowserFolders(open)
 
@@ -278,6 +283,23 @@ export function SettingsDialog({
               </ul>
             )}
           </section>
+
+          <section className="flex flex-col gap-2 rounded-[var(--radius)] border border-[var(--danger)]/30 p-3">
+            <h3 className="text-sm font-medium text-[var(--danger)]">清理数据</h3>
+            <p className="text-xs text-[var(--muted)]">
+              清空本插件里的书签、标签、分组、文件树、回收站和快照。主题与同步设置会保留，浏览器里的书签不会被删除。此操作无法撤销。
+            </p>
+            <div>
+              <Button
+                size="sm"
+                variant="danger"
+                isDisabled={clearing}
+                onPress={() => setConfirmClear(true)}
+              >
+                清空全部数据
+              </Button>
+            </div>
+          </section>
         </div>
       </Dialog>
 
@@ -292,6 +314,34 @@ export function SettingsDialog({
           void purge()
         }}
         onCancel={() => setConfirmPurge(false)}
+      />
+
+      <ConfirmDialog
+        open={confirmClear}
+        title="清空全部数据"
+        message="将删除本插件中的全部书签、标签、分组、文件树、回收站和快照，且无法恢复。浏览器书签和设置项会保留。确认继续？"
+        confirmLabel="清空"
+        danger
+        pending={clearing}
+        onConfirm={() => {
+          setClearing(true)
+          void (async () => {
+            try {
+              await send('data/clear', {})
+              setConfirmClear(false)
+              setSnapshots([])
+              await onCleared()
+              toast.success('本地数据已清空')
+            } catch (error) {
+              toast.danger(error instanceof Error ? error.message : String(error))
+            } finally {
+              setClearing(false)
+            }
+          })()
+        }}
+        onCancel={() => {
+          if (!clearing) setConfirmClear(false)
+        }}
       />
     </>
   )

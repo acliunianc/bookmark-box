@@ -9,8 +9,11 @@ export function hashPath(input: string): string {
   return hash.toString(16).padStart(8, '0')
 }
 
-export function faviconUrl(url: string, size = 32): string {
-  return `chrome-extension://${chrome.runtime.id}/_favicon/?pageUrl=${encodeURIComponent(url)}&size=${size}`
+/** Chrome 已缓存的站点图标；不在扩展环境（没有 runtime.id）时返回 null */
+export function faviconUrl(url: string, size = 32): string | null {
+  const id = chrome.runtime?.id
+  if (!id) return null
+  return `chrome-extension://${id}/_favicon/?pageUrl=${encodeURIComponent(url)}&size=${size}`
 }
 
 export function relativeTime(ts?: number): string {

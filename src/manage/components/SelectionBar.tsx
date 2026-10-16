@@ -1,8 +1,9 @@
 import { Button } from '@heroui/react'
-import { IconClose, IconTag, IconTrash } from '../../ui/icons'
+import { IconClose, IconExternal, IconTag, IconTrash } from '../../ui/icons'
 
 interface SelectionBarProps {
   count: number
+  onOpen: () => void
   onAddTags: () => void
   onRemoveTags: () => void
   onDelete: () => void
@@ -11,6 +12,7 @@ interface SelectionBarProps {
 
 export function SelectionBar({
   count,
+  onOpen,
   onAddTags,
   onRemoveTags,
   onDelete,
@@ -23,6 +25,9 @@ export function SelectionBar({
         <span className="px-2 text-sm">
           已选 <strong>{count}</strong>
         </span>
+        <Button size="sm" variant="primary" onPress={onOpen}>
+          <IconExternal width={14} height={14} /> 打开
+        </Button>
         <Button size="sm" variant="secondary" onPress={onAddTags}>
           <IconTag width={14} height={14} /> 打标签
         </Button>
@@ -32,7 +37,7 @@ export function SelectionBar({
         <Button size="sm" variant="danger-soft" onPress={onDelete}>
           <IconTrash width={14} height={14} /> 删除
         </Button>
-        <Button size="sm" variant="ghost" isIconOnly onPress={onCancel} aria-label="退出多选">
+        <Button size="sm" variant="ghost" isIconOnly onPress={onCancel} aria-label="取消选择">
           <IconClose width={14} height={14} />
         </Button>
       </div>

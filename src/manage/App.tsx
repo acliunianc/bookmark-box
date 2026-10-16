@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Button, Checkbox, Description, Spinner } from '@heroui/react'
 import { ROOT_FOLDER_NAME, walkFolderTree } from '../core/parseTree'
 import { filterBookmarks, parseQuery, sortBookmarks } from '../core/search'
-import { RECENT_WINDOW_MS, tagIdOf } from '../shared/constants'
+import { MAX_BATCH_OPEN, RECENT_WINDOW_MS, tagIdOf } from '../shared/constants'
 import { send } from '../shared/messages'
 import type { Bookmark, FilterLogic, FolderNode, SortKey, ViewMode, VirtualScope } from '../shared/types'
 import { useToast } from '../ui/toast'
@@ -48,7 +48,6 @@ export function ManageApp() {
 
   const [filter, setFilter] = useState<UiFilter>(INITIAL_FILTER)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
-  const [multiSelect, setMultiSelect] = useState(false)
   const [activeIndex, setActiveIndex] = useState(-1)
 
   const [batchNode, setBatchNode] = useState<FolderNode | null>(null)
@@ -171,26 +170,8 @@ export function ManageApp() {
     setActiveIndex(index)
   }, [])
 
-  const toggleSelect = useCallback((id: string, additive: boolean) => {
-    // Ctrl / Cmd 追加勾选时说明用户在挑多条，直接切到多选模式（勾选框随之出现）
-    if (additive) setMultiSelect(true)
-    setSelectedIds((prev) => {
-      const next = new Set(prev)
-      if (additive) {
-        if (next.has(id)) next.delete(id)
-        else next.add(id)
-      } else if (next.has(id)) {
-        next.delete(id)
-      } else {
-        next.add(id)
-      }
-      return next
-    })
-  }, [])
-
-  /** 勾选框直接切换某一条：同样进入多选模式 */
+  /** 勾选框直接切换某一条 */
   const setSelected = useCallback((id: string, selected: boolean) => {
-    setMultiSelect(true)
     setSelectedIds((prev) => {
       const next = new Set(prev)
       if (selected) next.add(id)
@@ -205,7 +186,6 @@ export function ManageApp() {
    */
   const selectRange = useCallback(
     (index: number) => {
-      setMultiSelect(true)
       setSelectedIds((prev) => {
         const next = new Set(prev)
         const from = Math.min(anchorIndexRef.current, index)
@@ -220,7 +200,6 @@ export function ManageApp() {
 
   /** 全选当前筛选结果 */
   const selectAll = useCallback(() => {
-    setMultiSelect(true)
     setSelectedIds(new Set(visible.map((bookmark) => bookmark.id)))
   }, [visible])
 
@@ -245,6 +224,32 @@ export function ManageApp() {
     },
     [store],
   )
+
+  /** 批量打开勾选的书签（按当前列表顺序），超出上限只开前面几条 */
+  const openSelected = useCallback(() => {
+    const picked = visible.filter((bookmark) => selectedIds.has(bookmark.id))
+    const targets = picked.slice(0, MAX_BATCH_OPEN)
+    if (targets.length === 0) return
+    // 同一轮同步发起，避免 await 之后浏览器把后续 tabs.create 当成非用户手势而拦截
+    for (let index = 0; index < targets.length; index += 1) {
+      const bookmark = targets[index]
+      void chrome.tabs.create({ url: bookmark.url, active: index === 0 })
+      void send('bookmark/recordOpen', { id: bookmark.id })
+        .then((result) => {
+          if (result.bookmark) store.applyBookmarks([result.bookmark])
+        })
+        .catch(() => {
+          /* 记录失败不影响打开 */
+        })
+    }
+    if (picked.length > targets.length) {
+      toast.push({
+        message: `已打开前 ${targets.length} 条`,
+        description: `一次最多打开 ${MAX_BATCH_OPEN} 个标签页，其余 ${picked.length - targets.length} 条未打开`,
+        variant: 'info',
+      })
+    }
+  }, [visible, selectedIds, store, toast])
 
   const openBackground = useCallback(
     async (bookmark: Bookmark) => {
@@ -430,7 +435,6 @@ export function ManageApp() {
         }
         if (selectedIds.size > 0) {
           setSelectedIds(new Set())
-          setMultiSelect(false)
           return
         }
         patchFilter({ tagIds: [], query: '', treePath: undefined, scope: 'all' })
@@ -444,7 +448,6 @@ export function ManageApp() {
         event.preventDefault()
         if (allSelected) {
           setSelectedIds(new Set())
-          setMultiSelect(false)
         } else {
           selectAll()
         }
@@ -457,7 +460,6 @@ export function ManageApp() {
         const next = Math.max(0, Math.min(visible.length - 1, activeIndex + delta))
         if (event.shiftKey) {
           // Shift + 方向键：从锚点一路扩选到新位置（锚点不动，连按可持续扩）
-          setMultiSelect(true)
           setSelectedIds((prev) => {
             const result = new Set(prev)
             const from = Math.min(anchorIndexRef.current, next)
@@ -643,13 +645,6 @@ export function ManageApp() {
             onSortChange={(sort) => patchFilter({ sort })}
             view={filter.view}
             onViewChange={(view) => patchFilter({ view })}
-            multiSelect={multiSelect}
-            onToggleMultiSelect={() => {
-              setMultiSelect((prev) => {
-                if (prev) setSelectedIds(new Set())
-                return !prev
-              })
-            }}
             treePath={filter.treePath}
             onClearTreePath={() => patchFilter({ treePath: undefined })}
             query={filter.query}
@@ -677,7 +672,6 @@ export function ManageApp() {
               tagById={store.tagById}
               keywords={keywords}
               selectedIds={selectedIds}
-              multiSelect={multiSelect}
               view={filter.view}
               activeIndex={activeIndex}
               emptyHint={
@@ -685,7 +679,6 @@ export function ManageApp() {
                   ? '还没有书签，去「导入」把浏览器书签迁进来，或用工具栏图标收藏当前页'
                   : '没有匹配的书签，试试调整筛选条件'
               }
-              onToggleSelect={toggleSelect}
               onSetSelected={setSelected}
               onActivate={activateItem}
               onRangeSelect={selectRange}
@@ -702,6 +695,7 @@ export function ManageApp() {
 
           <SelectionBar
             count={selectedIds.size}
+            onOpen={openSelected}
             onAddTags={() => {
               setEditIntent('add')
               setEditTargets(store.bookmarks.filter((item) => selectedIds.has(item.id)))
@@ -713,7 +707,6 @@ export function ManageApp() {
             onDelete={() => askDelete([...selectedIds])}
             onCancel={() => {
               setSelectedIds(new Set())
-              setMultiSelect(false)
             }}
           />
         </main>
@@ -800,6 +793,12 @@ export function ManageApp() {
         onClose={() => setSettingsOpen(false)}
         onUpdateSettings={store.updateSettings}
         onDataChanged={store.refresh}
+        onCleared={async () => {
+          setFilter(INITIAL_FILTER)
+          setSelectedIds(new Set())
+          setEditTagId(null)
+          await store.refresh()
+        }}
       />
 
       <ConfirmDialog

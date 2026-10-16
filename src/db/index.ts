@@ -243,6 +243,35 @@ export async function trimSnapshots(kind: SnapshotRecord['kind'], keep: number):
   await Promise.all([...stale.map((item) => tx.store.delete(item.id as number)), tx.done])
 }
 
+/**
+ * 清空用户数据：书签（含回收站）、标签、分组、文件树、快照与撤销记录。
+ * 主题、同步等设置保留；上次使用的标签组合一并清掉，避免指向已删除的标签。
+ */
+export async function clearUserData(): Promise<void> {
+  const db = await getDB()
+  const tx = db.transaction(
+    ['bookmarks', 'tags', 'groups', 'tree', 'snapshots', 'settings'],
+    'readwrite',
+  )
+  const settingsStore = tx.objectStore('settings')
+  const record = await settingsStore.get(SETTINGS_KEY)
+  await Promise.all([
+    tx.objectStore('bookmarks').clear(),
+    tx.objectStore('tags').clear(),
+    tx.objectStore('groups').clear(),
+    tx.objectStore('tree').clear(),
+    tx.objectStore('snapshots').clear(),
+  ])
+  const current = record ? stripKey(record) : { ...DEFAULT_SETTINGS }
+  await settingsStore.put({
+    key: SETTINGS_KEY,
+    ...current,
+    lastTagIds: [],
+    lastTagUsedAt: 0,
+  })
+  await tx.done
+}
+
 /* ------------------------------ 全库操作 ------------------------------ */
 
 export async function replaceAll(data: {

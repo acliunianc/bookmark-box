@@ -4,8 +4,9 @@ import { tagIdOf } from '../shared/constants'
 import { send, type PageContext } from '../shared/messages'
 import type { BrowserFolderMode, Tag } from '../shared/types'
 import { isSpecialPage } from '../core/normalizeUrl'
-import { faviconUrl, relativeTime } from '../shared/utils'
+import { relativeTime } from '../shared/utils'
 import { cn } from '../ui/cn'
+import { Favicon } from '../ui/Favicon'
 import { BrowserPlacementSelect, useBrowserFolders } from '../ui/BrowserFolderSelect'
 import { TagChip } from '../ui/TagChip'
 import { IconBolt, IconCheck, IconEdit, IconPlus, IconTrash } from '../ui/icons'
@@ -169,14 +170,7 @@ export function PopupApp() {
     <main className="flex h-[540px] w-[380px] flex-col gap-3 overflow-y-auto p-4">
       {/* 标题 / URL */}
       <header className="flex items-start gap-3">
-        <img
-          src={faviconUrl(state.url, 32)}
-          alt=""
-          className="mt-0.5 size-8 shrink-0 rounded-md bg-[var(--default)]"
-          onError={(event) => {
-            event.currentTarget.style.visibility = 'hidden'
-          }}
-        />
+        <Favicon url={state.url} size={32} className="mt-0.5 rounded-md" />
         <div className="min-w-0 flex-1">
           {editingTitle ? (
             <TextField

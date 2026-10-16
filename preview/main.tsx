@@ -151,8 +151,8 @@ function Preview() {
             onSortChange={() => undefined}
             view={view}
             onViewChange={setView}
-            multiSelect={false}
-            onToggleMultiSelect={() => undefined}
+            allSelected={false}
+            onToggleSelectAll={() => undefined}
             treePath="书签栏/开发工具"
             onClearTreePath={() => undefined}
             query=""
@@ -165,10 +165,11 @@ function Preview() {
             tagById={tagById}
             keywords={[]}
             selectedIds={new Set()}
-            multiSelect
             view={view}
             activeIndex={0}
-            onToggleSelect={() => undefined}
+            onSetSelected={() => undefined}
+            onActivate={() => undefined}
+            onRangeSelect={() => undefined}
             onOpen={() => undefined}
             onOpenBackground={() => undefined}
             onFilterByTag={() => undefined}

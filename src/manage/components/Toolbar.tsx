@@ -1,5 +1,5 @@
 import type { Key } from 'react'
-import { Button, ListBox, Select, Tag, TagGroup, ToggleButton, ToggleButtonGroup, Tooltip } from '@heroui/react'
+import { Button, ListBox, Select, Tag, TagGroup, ToggleButton, ToggleButtonGroup } from '@heroui/react'
 import type { FilterLogic, SortKey, Tag as TagItem, ViewMode } from '../../shared/types'
 import { IconFolder, IconGrid, IconList, IconPin, IconSearch } from '../../ui/icons'
 
@@ -14,8 +14,6 @@ interface ToolbarProps {
   onSortChange: (sort: SortKey) => void
   view: ViewMode
   onViewChange: (view: ViewMode) => void
-  multiSelect: boolean
-  onToggleMultiSelect: () => void
   /** 当前筛选结果是否已全部选中 */
   allSelected: boolean
   /** 全选 / 取消全选当前筛选结果 */
@@ -55,8 +53,6 @@ export function Toolbar({
   onSortChange,
   view,
   onViewChange,
-  multiSelect,
-  onToggleMultiSelect,
   allSelected,
   onToggleSelectAll,
   treePath,
@@ -192,31 +188,14 @@ export function Toolbar({
           </ToggleButton>
         </ToggleButtonGroup>
 
-        <Tooltip>
-          <Tooltip.Trigger>
-            <Button
-              size="sm"
-              variant={multiSelect ? 'primary' : 'ghost'}
-              onPress={onToggleMultiSelect}
-            >
-              多选
-            </Button>
-          </Tooltip.Trigger>
-          <Tooltip.Content>
-            多选模式（Ctrl / Cmd + 单击追加，Shift + 单击选一段，Ctrl + A 全选）
-          </Tooltip.Content>
-        </Tooltip>
-
-        {multiSelect ? (
-          <Button
-            size="sm"
-            variant="ghost"
-            onPress={onToggleSelectAll}
-            isDisabled={matchedCount === 0}
-          >
-            {allSelected ? '取消全选' : '全选'}
-          </Button>
-        ) : null}
+        <Button
+          size="sm"
+          variant="ghost"
+          onPress={onToggleSelectAll}
+          isDisabled={matchedCount === 0}
+        >
+          {allSelected ? '取消全选' : '全选'}
+        </Button>
       </div>
     </div>
   )

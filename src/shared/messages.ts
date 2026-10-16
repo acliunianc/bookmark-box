@@ -156,6 +156,8 @@ export interface RequestMap {
   'undo/apply': { req: Record<string, never>; res: { count: number } }
 
   'settings/update': { req: Partial<Settings>; res: { settings: Settings } }
+  /** 清空本地书签 / 标签 / 分组 / 文件树 / 快照；不删浏览器书签，设置项保留 */
+  'data/clear': { req: Record<string, never>; res: { ok: true } }
   'backup/import': { req: { text: string; mode: 'replace' | 'merge' }; res: { added: number; updated: number } }
   'snapshot/list': { req: Record<string, never>; res: { snapshots: SnapshotRecord[] } }
   'snapshot/restore': { req: { id: number }; res: { ok: true } }
