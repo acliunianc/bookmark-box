@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState, type ReactNode } from 'react'
 import { Label, ListBox, Select } from '@heroui/react'
 import { cn } from './cn'
-import { IconSearch } from './icons'
+import { IconFolder, IconSearch } from './icons'
 
 export interface SearchSelectOption {
   /** 回调给外部的取值 */
@@ -18,6 +18,8 @@ export interface SearchSelectOption {
   meta?: ReactNode
   /** 名称下方的辅助说明，如文件夹的父级路径 */
   description?: string
+  /** 名称左侧的图标 */
+  icon?: 'folder'
 }
 
 interface SearchSelectProps {
@@ -35,6 +37,11 @@ interface SearchSelectProps {
 
 function optionText(option: SearchSelectOption) {
   return option.textValue ?? option.label
+}
+
+function OptionIcon({ name }: { name?: SearchSelectOption['icon'] }) {
+  if (name === 'folder') return <IconFolder className="text-[var(--warning)]" />
+  return null
 }
 
 function matchesQuery(option: SearchSelectOption, query: string) {
@@ -115,13 +122,20 @@ export function SearchSelect({
       {label ? <Label className="text-xs font-medium text-[var(--muted)]">{label}</Label> : null}
       <Select.Trigger className="w-full min-w-0">
         <Select.Value className="min-w-0 overflow-hidden">
-          <span
-            className={cn(
-              'block truncate',
-              selectedLabel ? 'text-[var(--field-foreground)]' : 'text-[var(--field-placeholder)]',
-            )}
-          >
-            {selectedLabel || placeholder}
+          <span className="flex min-w-0 items-center gap-2">
+            {selected?.icon ? (
+              <span className="shrink-0">
+                <OptionIcon name={selected.icon} />
+              </span>
+            ) : null}
+            <span
+              className={cn(
+                'truncate',
+                selectedLabel ? 'text-[var(--field-foreground)]' : 'text-[var(--field-placeholder)]',
+              )}
+            >
+              {selectedLabel || placeholder}
+            </span>
           </span>
         </Select.Value>
         <Select.Indicator />
@@ -156,35 +170,42 @@ export function SearchSelect({
         >
           {filtered.map((option) => (
             <ListBox.Item key={option.id} id={option.id} textValue={optionText(option)}>
-              <span className="flex min-w-0 flex-1 flex-col">
-                <span className="flex min-w-0 items-center gap-2">
-                  {option.color ? (
+              <span className="flex min-w-0 flex-1 items-start gap-2">
+                {option.icon ? (
+                  <span className="flex h-5 shrink-0 items-center">
+                    <OptionIcon name={option.icon} />
+                  </span>
+                ) : null}
+                <span className="flex min-w-0 flex-1 flex-col">
+                  <span className="flex min-w-0 items-center gap-2">
+                    {option.color ? (
+                      <span
+                        className={cn(
+                          'size-2 shrink-0',
+                          option.shape === 'square' ? 'rounded-sm' : 'rounded-full',
+                        )}
+                        style={{ backgroundColor: option.color }}
+                        aria-hidden="true"
+                      />
+                    ) : null}
+                    <span className="truncate leading-5">{option.label}</span>
+                    {option.meta != null ? (
+                      <span className="ms-auto shrink-0 text-xs text-[var(--muted)] tabular-nums">
+                        {option.meta}
+                      </span>
+                    ) : null}
+                  </span>
+                  {option.description ? (
                     <span
                       className={cn(
-                        'size-2 shrink-0',
-                        option.shape === 'square' ? 'rounded-sm' : 'rounded-full',
+                        'truncate text-xs text-[var(--muted)]',
+                        option.color && 'ps-4',
                       )}
-                      style={{ backgroundColor: option.color }}
-                      aria-hidden="true"
-                    />
-                  ) : null}
-                  <span className="truncate">{option.label}</span>
-                  {option.meta != null ? (
-                    <span className="ms-auto shrink-0 text-xs text-[var(--muted)] tabular-nums">
-                      {option.meta}
+                    >
+                      {option.description}
                     </span>
                   ) : null}
                 </span>
-                {option.description ? (
-                  <span
-                    className={cn(
-                      'truncate text-xs text-[var(--muted)]',
-                      option.color && 'ps-4',
-                    )}
-                  >
-                    {option.description}
-                  </span>
-                ) : null}
               </span>
               <ListBox.ItemIndicator />
             </ListBox.Item>

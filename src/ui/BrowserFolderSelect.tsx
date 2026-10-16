@@ -76,13 +76,14 @@ export function BrowserPlacementSelect({
 
   const options = useMemo<SearchSelectOption[]>(
     () => [
-      { id: AUTO_KEY, label: autoLabel },
+      { id: AUTO_KEY, label: autoLabel, icon: 'folder' },
       ...folders.map((folder) => ({
         id: folder.id,
         label: folder.name,
         // 按完整路径搜索，同名文件夹可以靠父级路径区分
         textValue: folder.path,
         description: parentPathLabel(folder.path, folder.name),
+        icon: 'folder' as const,
       })),
     ],
     [autoLabel, folders],
