@@ -30,7 +30,7 @@ chrome.runtime.onMessage.addListener((message: IncomingMessage, _sender, sendRes
   Promise.resolve(handler(message.payload as never))
     .then((data) => sendResponse({ ok: true, data }))
     .catch((error: unknown) => {
-      console.error('[TagMark] 处理失败：', message.type, error)
+      console.error('[BookmarkBox] 处理失败：', message.type, error)
       sendResponse({ ok: false, error: error instanceof Error ? error.message : String(error) })
     })
 
@@ -75,7 +75,7 @@ async function instantSave(): Promise<void> {
     })
     await flashBadge('✓', '#22c55e')
   } catch (error) {
-    console.error('[TagMark] 极速保存失败：', error)
+    console.error('[BookmarkBox] 极速保存失败：', error)
     await flashBadge('×', '#ef4444')
   }
 }
@@ -92,15 +92,15 @@ chrome.commands.onCommand.addListener(async (command) => {
     }
     if (command === 'instant-save') await instantSave()
   } catch (error) {
-    console.error('[TagMark] 快捷键处理失败：', command, error)
+    console.error('[BookmarkBox] 快捷键处理失败：', command, error)
   }
 })
 
 chrome.runtime.onInstalled.addListener((details) => {
   chrome.contextMenus.removeAll(() => {
     chrome.contextMenus.create({
-      id: 'tagmark-open-manage',
-      title: '打开 TagMark 管理页',
+      id: 'bookmarkbox-open-manage',
+      title: '打开 BookmarkBox 管理页',
       contexts: ['action'],
     })
   })
@@ -110,5 +110,5 @@ chrome.runtime.onInstalled.addListener((details) => {
 })
 
 chrome.contextMenus.onClicked.addListener((info) => {
-  if (info.menuItemId === 'tagmark-open-manage') openManagePage()
+  if (info.menuItemId === 'bookmarkbox-open-manage') openManagePage()
 })

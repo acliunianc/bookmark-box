@@ -28,7 +28,7 @@ export function Sidebar({ tagCount, tagPanel, treePanel }: SidebarProps) {
       return
     }
     if (dragging.current === 'split') {
-      const container = document.getElementById('tagmark-sidebar-body')
+      const container = document.getElementById('bookmarkbox-sidebar-body')
       if (!container) return
       const rect = container.getBoundingClientRect()
       setRatio(Math.min(0.85, Math.max(0.15, (event.clientY - rect.top) / rect.height)))
@@ -79,7 +79,7 @@ export function Sidebar({ tagCount, tagPanel, treePanel }: SidebarProps) {
 
   return (
     <div className="relative flex shrink-0 border-r border-[var(--separator)] bg-[var(--surface)]" style={{ width }}>
-      <div id="tagmark-sidebar-body" className="flex min-h-0 flex-1 flex-col">
+      <div id="bookmarkbox-sidebar-body" className="flex min-h-0 flex-1 flex-col">
         {/* 标签区 */}
         <section
           className="flex min-h-0 flex-col"

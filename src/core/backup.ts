@@ -1,7 +1,11 @@
 import type { Bookmark, Settings, Tag, TagGroup, TreeSnapshot } from '../shared/types'
 
+const BACKUP_FORMAT = 'bookmarkbox-backup' as const
+/** 旧版 TagMark 导出格式，导入时仍接受 */
+const LEGACY_BACKUP_FORMAT = 'tagmark-backup' as const
+
 export interface BackupFile {
-  format: 'tagmark-backup'
+  format: typeof BACKUP_FORMAT
   version: 1
   exportedAt: number
   bookmarks: Bookmark[]
@@ -19,7 +23,7 @@ export function buildBackup(input: {
   settings: Settings
 }): string {
   const payload: BackupFile = {
-    format: 'tagmark-backup',
+    format: BACKUP_FORMAT,
     version: 1,
     exportedAt: Date.now(),
     bookmarks: input.bookmarks,
@@ -32,15 +36,17 @@ export function buildBackup(input: {
 }
 
 export function parseBackup(text: string): BackupFile {
-  const parsed = JSON.parse(text) as Partial<BackupFile>
-  if (parsed.format !== 'tagmark-backup') {
-    throw new Error('不是 TagMark 备份文件（缺少 format: tagmark-backup）')
+  const parsed = JSON.parse(text) as Partial<BackupFile> & { format?: string }
+  if (parsed.format !== BACKUP_FORMAT && parsed.format !== LEGACY_BACKUP_FORMAT) {
+    throw new Error(
+      `不是 BookmarkBox 备份文件（缺少 format: ${BACKUP_FORMAT}）`,
+    )
   }
   if (!Array.isArray(parsed.bookmarks)) {
     throw new Error('备份文件缺少 bookmarks 字段')
   }
   return {
-    format: 'tagmark-backup',
+    format: BACKUP_FORMAT,
     version: 1,
     exportedAt: parsed.exportedAt ?? Date.now(),
     bookmarks: parsed.bookmarks,

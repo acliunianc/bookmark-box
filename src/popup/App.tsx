@@ -131,7 +131,7 @@ export function PopupApp() {
         browserFolderId: placement.folderId,
       })
       if (result.browserSyncError) {
-        toast.danger(`已保存到 TagMark，但同步浏览器书签失败：${result.browserSyncError}`)
+        toast.danger(`已保存到 BookmarkBox，但同步浏览器书签失败：${result.browserSyncError}`)
         setSaving(false)
         return
       }

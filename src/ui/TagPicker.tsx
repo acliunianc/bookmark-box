@@ -15,7 +15,7 @@ interface TagPickerProps {
   hideEmptyHint?: boolean
 }
 
-const CREATE_KEY = '__tagmark_create__'
+const CREATE_KEY = '__bookmarkbox_create__'
 
 /** 标签选择器：HeroUI TextField/Input + ListBox 建议列表 + TagGroup 已选标签 */
 export function TagPicker({
@@ -149,7 +149,7 @@ export function TagPicker({
                 </ListBox.Item>
               ) : null}
               {suggestions.length === 0 && !canCreate ? (
-                <ListBox.Item id="__tagmark_empty__" textValue="无匹配">
+                <ListBox.Item id="__bookmarkbox_empty__" textValue="无匹配">
                   <span className="text-xs text-[var(--muted)]">无匹配标签</span>
                 </ListBox.Item>
               ) : null}

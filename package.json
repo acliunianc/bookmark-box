@@ -1,9 +1,9 @@
 {
-  "name": "tagmark",
+  "name": "bookmark-box",
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "TagMark - 标签式书签管理浏览器扩展 (Manifest V3)",
+  "description": "BookmarkBox - 标签式书签管理浏览器扩展 (Manifest V3)",
   "packageManager": "pnpm@11.7.0",
   "engines": {
     "node": ">=20.19.0",

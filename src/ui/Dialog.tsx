@@ -12,6 +12,11 @@ export interface DialogProps {
   width?: number
   /** 点遮罩是否关闭（批量操作进行中可设为 false） */
   closeOnBackdrop?: boolean
+  /**
+   * 关掉进出场动画。设置类弹窗（标签/分组）内容重、动画反而拖手感，
+   * 退出时 zoom+fade 还会跟底层页面叠出「闪一下」。
+   */
+  instant?: boolean
 }
 
 /**
@@ -27,6 +32,7 @@ export function Dialog({
   footer,
   width = 520,
   closeOnBackdrop = true,
+  instant = false,
 }: DialogProps) {
   return (
     <Modal>
@@ -34,8 +40,13 @@ export function Dialog({
         isOpen={open}
         onOpenChange={(next) => (next ? undefined : onClose())}
         isDismissable={closeOnBackdrop}
+        className={instant ? 'bookmarkbox-modal-instant' : undefined}
       >
-        <Modal.Container placement="center" scroll="inside">
+        <Modal.Container
+          placement="center"
+          scroll="inside"
+          className={instant ? 'bookmarkbox-modal-instant' : undefined}
+        >
           <Modal.Dialog style={{ maxWidth: width }}>
             <Modal.CloseTrigger />
             {title ? (

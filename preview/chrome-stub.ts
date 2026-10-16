@@ -3,5 +3,5 @@
  * 这里给 faviconUrl 等用到 chrome.runtime.id 的地方补一个桩。
  */
 ;(globalThis as unknown as { chrome: unknown }).chrome = {
-  runtime: { id: 'tagmark-preview' },
+  runtime: { id: 'bookmarkbox-preview' },
 }

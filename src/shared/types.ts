@@ -1,4 +1,4 @@
-/** TagMark 领域模型 —— 与需求文档 5. 数据模型与存储 保持一致 */
+/** BookmarkBox 领域模型 —— 与需求文档 5. 数据模型与存储 保持一致 */
 
 export interface Bookmark {
   /** = sha1(normUrl) 前 12 位，天然去重 */

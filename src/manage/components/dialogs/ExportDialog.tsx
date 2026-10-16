@@ -37,13 +37,13 @@ export function ExportDialog({
 
   const exportJson = () => {
     const content = buildBackup({ bookmarks, tags, groups, tree, settings })
-    download(`tagmark-backup-${timestampTag()}.json`, content)
+    download(`bookmarkbox-backup-${timestampTag()}.json`, content)
     toast.success('已导出 JSON 全量备份')
   }
 
   const exportHtml = () => {
     const content = buildNetscapeHtml(bookmarks, tags, strategy)
-    download(`tagmark-bookmarks-${timestampTag()}.html`, content, 'text/html')
+    download(`bookmarkbox-bookmarks-${timestampTag()}.html`, content, 'text/html')
     toast.success('已导出标准 HTML 书签')
   }
 
@@ -82,7 +82,7 @@ export function ExportDialog({
             书签 + 标签 + 标签关联 + 文件树快照 + 设置；可用本插件再导入恢复
           </p>
           <Button className="mt-3" variant="secondary" onPress={exportJson}>
-            下载 tagmark-backup-{timestampTag()}.json
+            下载 bookmarkbox-backup-{timestampTag()}.json
           </Button>
         </section>
 

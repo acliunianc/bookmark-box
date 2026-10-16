@@ -211,7 +211,7 @@ export function BookmarkList(props: BookmarkListProps) {
   )
 
   const handleDragStart = (event: DragEvent, bookmark: Bookmark) => {
-    event.dataTransfer.setData('text/tagmark-bookmark', bookmark.id)
+    event.dataTransfer.setData('text/bookmarkbox-bookmark', bookmark.id)
     event.dataTransfer.effectAllowed = 'link'
   }
 

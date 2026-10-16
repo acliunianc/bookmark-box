@@ -4,7 +4,7 @@ const VERSION = '0.1.0'
 
 export default defineManifest({
   manifest_version: 3,
-  name: 'TagMark',
+  name: 'BookmarkBox',
   version: VERSION,
   description: '标签式书签管理：3 秒收藏、标签组合检索、文件树批量打标签',
   icons: {
@@ -15,7 +15,7 @@ export default defineManifest({
   },
   action: {
     default_popup: 'index.html',
-    default_title: 'TagMark · 收藏当前页',
+    default_title: 'BookmarkBox · 收藏当前页',
     default_icon: {
       16: 'icon-16.png',
       32: 'icon-32.png',

@@ -138,3 +138,15 @@ body {
 .radio:has(input:checked) .radio__control {
   border-color: transparent;
 }
+
+/*
+ * 即时 Modal：取消 HeroUI 默认的 fade/zoom 进出场。
+ * 退出动画会让遮罩与内容不同步淡出，底下页面「闪一下」。
+ */
+.modal__backdrop.bookmarkbox-modal-instant[data-entering='true'],
+.modal__backdrop.bookmarkbox-modal-instant[data-exiting='true'],
+.modal__container.bookmarkbox-modal-instant[data-entering='true'],
+.modal__container.bookmarkbox-modal-instant[data-exiting='true'] {
+  animation: none !important;
+  transition: none !important;
+}

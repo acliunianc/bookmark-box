@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Button, Checkbox, Description, Spinner } from '@heroui/react'
+import { ROOT_FOLDER_NAME, walkFolderTree } from '../core/parseTree'
 import { filterBookmarks, parseQuery, sortBookmarks } from '../core/search'
 import { RECENT_WINDOW_MS, tagIdOf } from '../shared/constants'
 import { send } from '../shared/messages'
@@ -9,9 +10,9 @@ import { BookmarkList } from './components/BookmarkList'
 import { Sidebar } from './components/Sidebar'
 import { SelectionBar } from './components/SelectionBar'
 import { TagPanel } from './components/TagPanel'
-import { GroupDetailDialog, TagDetailDialog } from './components/TagDetailDialogs'
+import { TagDetailDialog } from './components/TagDetailDialogs'
 import { Toolbar } from './components/Toolbar'
-import { TopBar } from './components/TopBar'
+import { TopBar, type SearchFolderOption, type SearchLauncher } from './components/TopBar'
 import { TreePanel } from './components/TreePanel'
 import { BatchTagDialog } from './components/dialogs/BatchTagDialog'
 import { ConfirmDialog } from './components/dialogs/ConfirmDialog'
@@ -43,7 +44,7 @@ const INITIAL_FILTER: UiFilter = {
 export function ManageApp() {
   const store = useStore()
   const toast = useToast()
-  const searchWrapperRef = useRef<HTMLDivElement | null>(null)
+  const searchLauncherRef = useRef<SearchLauncher | null>(null)
 
   const [filter, setFilter] = useState<UiFilter>(INITIAL_FILTER)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
@@ -54,7 +55,6 @@ export function ManageApp() {
   const [editTargets, setEditTargets] = useState<Bookmark[] | null>(null)
   const [editIntent, setEditIntent] = useState<'add' | 'remove'>('add')
   const [editTagId, setEditTagId] = useState<string | null>(null)
-  const [editGroupId, setEditGroupId] = useState<string | null>(null)
   const [importOpen, setImportOpen] = useState(false)
   const [exportOpen, setExportOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
@@ -97,6 +97,17 @@ export function ManageApp() {
     }
     return { tagCounts, recent, untagged }
   }, [store.bookmarks])
+
+  /** 顶部搜索 `in:` 补全用的文件夹列表（跳过合成根「书签」） */
+  const searchFolders = useMemo<SearchFolderOption[]>(() => {
+    if (!store.tree) return []
+    const out: SearchFolderOption[] = []
+    walkFolderTree(store.tree.root, (node) => {
+      if (!node.path || node.path === ROOT_FOLDER_NAME) return
+      out.push({ name: node.name, path: node.path, totalCount: node.totalCount })
+    })
+    return out
+  }, [store.tree])
 
   /* ------------------------------ 过滤 ------------------------------ */
   const { keywordHits, keywords, folderQuery, queryTagIds } = useMemo(() => {
@@ -399,9 +410,16 @@ export function ManageApp() {
         target instanceof HTMLSelectElement ||
         target?.isContentEditable
 
+      // Ctrl/⌘+K：打开搜索（输入框里也能用，类似命令面板）
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault()
+        searchLauncherRef.current?.open()
+        return
+      }
+
       if (event.key === '/' && !typing) {
         event.preventDefault()
-        searchWrapperRef.current?.querySelector('input')?.focus()
+        searchLauncherRef.current?.open()
         return
       }
 
@@ -480,14 +498,15 @@ export function ManageApp() {
     .filter((tag): tag is NonNullable<typeof tag> => Boolean(tag))
 
   const menuTag = editTagId ? store.tags.find((tag) => tag.id === editTagId) : undefined
-  const menuGroup = editGroupId ? store.groups.find((group) => group.id === editGroupId) : undefined
 
   return (
     <div className="flex h-screen flex-col bg-[var(--background)] text-[var(--foreground)]">
       <TopBar
         query={filter.query}
         onQueryChange={(value) => patchFilter({ query: value })}
-        searchRef={searchWrapperRef}
+        searchRef={searchLauncherRef}
+        tags={store.tags}
+        folders={searchFolders}
         onImport={() => setImportOpen(true)}
         onExport={() => setExportOpen(true)}
         onSettings={() => setSettingsOpen(true)}
@@ -546,7 +565,34 @@ export function ManageApp() {
                 })()
               }}
               onEditTag={(id) => setEditTagId(id)}
-              onEditGroup={(id) => setEditGroupId(id)}
+              onGroupRename={async (id, name) => {
+                try {
+                  const result = await send('group/rename', { id, name })
+                  store.applyGroups(result.groups)
+                } catch (error) {
+                  toast.danger(error instanceof Error ? error.message : String(error))
+                }
+              }}
+              onGroupColor={async (id, color) => {
+                const result = await send('group/color', { id, color })
+                store.applyGroups(result.groups)
+              }}
+              onGroupMove={async (id, direction) => {
+                const ids = store.groups.map((group) => group.id)
+                const index = ids.indexOf(id)
+                const target = index + direction
+                if (index < 0 || target < 0 || target >= ids.length) return
+                const next = [...ids]
+                ;[next[index], next[target]] = [next[target], next[index]]
+                const result = await send('group/reorder', { ids: next })
+                store.applyGroups(result.groups)
+              }}
+              onGroupDelete={async (id) => {
+                const result = await send('group/delete', { id })
+                store.applyGroups(result.groups)
+                store.applyTags(result.tags)
+                toast.success('分组已删除（标签保留为未分组）')
+              }}
               onPin={toggleTagPin}
               onDropBookmarks={(tagId, bookmarkId) => {
                 void bulkTag({ ids: [bookmarkId], tagIds: [tagId], removeTagIds: [], mode: 'append' })
@@ -825,42 +871,6 @@ export function ManageApp() {
         }}
       />
 
-      <GroupDetailDialog
-        open={Boolean(menuGroup)}
-        group={menuGroup ?? null}
-        tagCount={menuGroup ? store.tags.filter((tag) => tag.groupId === menuGroup.id).length : 0}
-        index={menuGroup ? store.groups.findIndex((group) => group.id === menuGroup.id) : 0}
-        total={store.groups.length}
-        onClose={() => setEditGroupId(null)}
-        onRename={async (id, name) => {
-          try {
-            const result = await send('group/rename', { id, name })
-            store.applyGroups(result.groups)
-          } catch (error) {
-            toast.danger(error instanceof Error ? error.message : String(error))
-          }
-        }}
-        onColor={async (id, color) => {
-          const result = await send('group/color', { id, color })
-          store.applyGroups(result.groups)
-        }}
-        onMove={async (id, direction) => {
-          const ids = store.groups.map((group) => group.id)
-          const index = ids.indexOf(id)
-          const target = index + direction
-          if (index < 0 || target < 0 || target >= ids.length) return
-          const next = [...ids]
-          ;[next[index], next[target]] = [next[target], next[index]]
-          const result = await send('group/reorder', { ids: next })
-          store.applyGroups(result.groups)
-        }}
-        onDelete={async (id) => {
-          const result = await send('group/delete', { id })
-          store.applyGroups(result.groups)
-          store.applyTags(result.tags)
-          toast.success('分组已删除（标签保留为未分组）')
-        }}
-      />
     </div>
   )
 }

@@ -1,4 +1,4 @@
-# TagMark · 标签式书签管理插件
+# BookmarkBox · 标签式书签管理插件
 
 用「标签」替代「文件夹」承担书签组织职责：一条书签可属于多个标签，靠多标签交集 / 并集筛选；
 原有文件夹结构不丢弃，导入时生成**只读文件树快照**，作为「批量打标签的批处理器」。
@@ -72,7 +72,7 @@ preview/           # 仅本地验收用：单独渲染 TagPanel / BookmarkList�
 | 分组 ⋯：重命名 / 改色 / 上移下移 / 删除（仅解散分组） | `dialogs/TagDetailDialogs.tsx`                    |
 | 文件树只读快照（导入生成、整体覆盖）  | `core/parseTree.ts`、`background/handlers.ts`                   |
 | 文件树节点批量打标签（可选递归 + 撤销） | `components/dialogs/BatchTagDialog.tsx`                       |
-| 搜索：多关键词 / `#标签` / `in:文件夹` | `core/search.ts`（MiniSearch，中文按字 + 二元组切分）          |
+| 搜索：多关键词 / `#标签` / `in:文件夹`（输入时下拉补全） | `core/search.ts` + `TopBar.tsx`（MiniSearch；`#` / `in:` 弹出建议） |
 | 列表 / 网格视图、虚拟滚动、多选批量操作 | `components/BookmarkList.tsx`、`SelectionBar.tsx`             |
 | HTML 导入向导（预览 / 冲突策略 / 结果报告 / 撤销） | `dialogs/ImportDialog.tsx`                          |
 | 按文件夹路径生成标签（勾选开关 + 逐文件夹「标签 / 分组 / 不处理」，可按子树批量套用） | `core/parseTree.ts` 的 `folderTagPlan`、`components/ImportFolderPlan.tsx` |
@@ -85,6 +85,9 @@ preview/           # 仅本地验收用：单独渲染 TagPanel / BookmarkList�
 
 ## 交互约定
 
+- **顶部搜索**：顶栏居中假搜索条；点击或 `Ctrl/⌘+K` / `/` 后就地变宽成真输入（最多约 50vw）。
+  输入 `#` / `in:` 弹出与搜索框同宽的建议；Enter / Esc / 点外部收起（一步完成，无弹窗）。
+  输入有防抖；中文 IME 合成期间不拦截按键、不上屏中间态。
 - **左侧标签点击 = 切换筛选**：点另一个标签会直接替换当前筛选（不累加），再点已选中且唯一的标签则取消；
   需要多标签组合（AND / OR）时用 `Ctrl` / `Cmd` / `Shift` + 点击，或用标签 chip 上的 × 单独移除。
 - **书签多选**：勾选框或工具栏「多选」进入多选模式后，`Ctrl/⌘` + 点击逐条加选、`Shift` + 点击从锚点成片选中、
@@ -145,7 +148,7 @@ preview/           # 仅本地验收用：单独渲染 TagPanel / BookmarkList�
 | ------ | ------------------------------------- | --------------------------------- |
 | 全局   | `Ctrl+Shift+S`                        | 打开快速收藏浮层                  |
 | 全局   | 自定义（`chrome://extensions/shortcuts`） | `instant-save`：上次标签组合极速保存 |
-| 管理页 | `/`                                   | 聚焦搜索框                        |
+| 管理页 | `Ctrl/⌘+K` 或 `/`                     | 展开顶部搜索                      |
 | 管理页 | `↑` `↓` + `Enter`                     | 键盘导航并打开                    |
 | 管理页 | `Shift+↑` `Shift+↓`                   | 从锚点扩选一段                    |
 | 管理页 | `Ctrl/⌘+A`                            | 全选当前筛选结果（再按一次取消）  |

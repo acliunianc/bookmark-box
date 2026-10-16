@@ -17,9 +17,10 @@ import { UNGROUPED_KEY } from '../../shared/constants'
 import type { Tag, TagGroup, VirtualScope } from '../../shared/types'
 import { cn } from '../../ui/cn'
 import { IconClock, IconEllipsis, IconFolder, IconPin, IconPlus, IconTag } from '../../ui/icons'
+import { GroupDetailDialog } from './TagDetailDialogs'
 
 /** 置顶标签拖拽排序时使用的私有 MIME，避免和「书签拖到标签」串味 */
-const PIN_MIME = 'text/tagmark-pin'
+const PIN_MIME = 'text/bookmarkbox-pin'
 
 interface TagPanelProps {
   tags: Tag[]
@@ -35,7 +36,11 @@ interface TagPanelProps {
   onNewTag: (name: string) => void
   onNewGroup: (name: string) => void
   onEditTag: (id: string) => void
-  onEditGroup: (id: string) => void
+  /** 分组设置弹窗：操作留在侧栏内，避免 App 整页因 editGroupId 重渲 */
+  onGroupRename: (id: string, name: string) => Promise<void>
+  onGroupColor: (id: string, color: string) => Promise<void>
+  onGroupMove: (id: string, direction: -1 | 1) => Promise<void>
+  onGroupDelete: (id: string) => Promise<void>
   /** 置顶 / 取消置顶（左侧图钉按钮触发） */
   onPin: (id: string, pinned: boolean) => void
   /** 把书签拖到标签上直接关联 */
@@ -66,7 +71,10 @@ export function TagPanel({
   onNewTag,
   onNewGroup,
   onEditTag,
-  onEditGroup,
+  onGroupRename,
+  onGroupColor,
+  onGroupMove,
+  onGroupDelete,
   onPin,
   onDropBookmarks,
   onMoveTagToGroup,
@@ -78,6 +86,7 @@ export function TagPanel({
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
   const [dropTagId, setDropTagId] = useState<string | null>(null)
   const [dropGroupKey, setDropGroupKey] = useState<string | null>(null)
+  const [editGroupId, setEditGroupId] = useState<string | null>(null)
   /** 置顶区拖拽排序：插入位置（0..n） */
   const [pinDropIndex, setPinDropIndex] = useState<number | null>(null)
   const [draggingPinId, setDraggingPinId] = useState<string | null>(null)
@@ -100,6 +109,10 @@ export function TagPanel({
     const value = keyword.trim().toLowerCase()
     return pinnedTags(value ? tags.filter((tag) => tag.name.toLowerCase().includes(value)) : tags)
   }, [keyword, tags])
+
+  const editGroup = editGroupId
+    ? (groups.find((group) => group.id === editGroupId) ?? null)
+    : null
 
   const visibleCount = buckets.reduce((sum, bucket) => sum + bucket.tags.length, 0) + pinList.length
 
@@ -147,7 +160,7 @@ export function TagPanel({
         draggable
         data-pin-chip={inPinZone ? '' : undefined}
         onDragStart={(event) => {
-          event.dataTransfer.setData('text/tagmark-tag', tag.id)
+          event.dataTransfer.setData('text/bookmarkbox-tag', tag.id)
           if (inPinZone) {
             // 带上私有类型，置顶区只对「置顶标签之间」的重排做响应
             event.dataTransfer.setData(PIN_MIME, tag.id)
@@ -161,7 +174,7 @@ export function TagPanel({
         }}
         onDragOver={(event) => {
           // 书签拖进来 = 关联标签；标签拖进来不处理（由分组容器接管）
-          if (event.dataTransfer.types.includes('text/tagmark-bookmark')) {
+          if (event.dataTransfer.types.includes('text/bookmarkbox-bookmark')) {
             event.preventDefault()
             event.stopPropagation()
             setDropTagId(tag.id)
@@ -169,7 +182,7 @@ export function TagPanel({
         }}
         onDragLeave={() => setDropTagId((prev) => (prev === tag.id ? null : prev))}
         onDrop={(event) => {
-          const bookmarkId = event.dataTransfer.getData('text/tagmark-bookmark')
+          const bookmarkId = event.dataTransfer.getData('text/bookmarkbox-bookmark')
           if (!bookmarkId) return
           event.preventDefault()
           event.stopPropagation()
@@ -366,14 +379,14 @@ export function TagPanel({
         onDragOver={(event) => {
           // 置顶区内的排序拖拽不参与「移入分组」
           if (event.dataTransfer.types.includes(PIN_MIME)) return
-          if (!event.dataTransfer.types.includes('text/tagmark-tag')) return
+          if (!event.dataTransfer.types.includes('text/bookmarkbox-tag')) return
           event.preventDefault()
           setDropGroupKey(key)
         }}
         onDragLeave={() => setDropGroupKey((prev) => (prev === key ? null : prev))}
         onDrop={(event) => {
           if (event.dataTransfer.types.includes(PIN_MIME)) return
-          const tagId = event.dataTransfer.getData('text/tagmark-tag')
+          const tagId = event.dataTransfer.getData('text/bookmarkbox-tag')
           if (!tagId) return
           event.preventDefault()
           setDropGroupKey(null)
@@ -410,7 +423,7 @@ export function TagPanel({
                 variant="ghost"
                 className="size-5 min-h-0 min-w-0 rounded-full p-0 text-[var(--muted)]"
                 aria-label={`编辑分组 ${bucket.group.name}`}
-                onPress={() => onEditGroup(bucket.group!.id)}
+                onPress={() => setEditGroupId(bucket.group!.id)}
               >
                 <IconEllipsis width={14} height={14} />
               </Button>
@@ -552,6 +565,21 @@ export function TagPanel({
           </>
         )}
       </div>
+
+      <GroupDetailDialog
+        open={Boolean(editGroup)}
+        group={editGroup}
+        tagCount={
+          editGroup ? tags.filter((tag) => tag.groupId === editGroup.id).length : 0
+        }
+        index={editGroup ? groups.findIndex((group) => group.id === editGroup.id) : 0}
+        total={groups.length}
+        onClose={() => setEditGroupId(null)}
+        onRename={onGroupRename}
+        onColor={onGroupColor}
+        onMove={onGroupMove}
+        onDelete={onGroupDelete}
+      />
     </div>
   )
 }

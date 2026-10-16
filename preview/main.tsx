@@ -5,7 +5,7 @@ import { Button } from '@heroui/react'
 import { BookmarkList } from '../src/manage/components/BookmarkList'
 import { TagPanel } from '../src/manage/components/TagPanel'
 import { Toolbar } from '../src/manage/components/Toolbar'
-import { TagDetailDialog, GroupDetailDialog } from '../src/manage/components/TagDetailDialogs'
+import { TagDetailDialog } from '../src/manage/components/TagDetailDialogs'
 import { TagEditDialog } from '../src/manage/components/dialogs/TagEditDialog'
 import type { Bookmark, Tag, TagGroup } from '../src/shared/types'
 import '../src/styles/global.css'
@@ -88,14 +88,13 @@ function Preview() {
   const [view, setView] = useState<'list' | 'grid'>('list')
   const [bulk, setBulk] = useState<Bookmark[]>([])
   const [editTag, setEditTag] = useState<Tag | null>(null)
-  const [editGroup, setEditGroup] = useState<TagGroup | null>(null)
   const [tagEditOpen, setTagEditOpen] = useState(false)
   const items = bulk.length > 0 ? bulk : bookmarks
 
   return (
     <div className="flex h-screen flex-col bg-[var(--background)] text-[var(--foreground)]">
       <div className="flex items-center gap-3 border-b border-[var(--separator)] p-3">
-        <strong className="text-sm">TagMark 预览</strong>
+        <strong className="text-sm">BookmarkBox 预览</strong>
         <Button size="sm" variant="secondary" onPress={() => setView(view === 'list' ? 'grid' : 'list')}>
           切换视图：{view}
         </Button>
@@ -105,12 +104,10 @@ function Preview() {
         <Button size="sm" variant="secondary" onPress={() => setEditTag(tags[0])}>
           标签详情弹窗
         </Button>
-        <Button size="sm" variant="secondary" onPress={() => setEditGroup(groups[0])}>
-          分组详情弹窗
-        </Button>
         <Button size="sm" variant="secondary" onPress={() => setTagEditOpen(true)}>
           编辑标签弹窗
         </Button>
+        <span className="text-xs text-[var(--muted)]">分组详情：点侧栏分组 ⋯</span>
         <span className="text-xs text-[var(--muted)]">当前 {items.length} 条</span>
       </div>
       <div className="flex min-h-0 flex-1">
@@ -133,7 +130,12 @@ function Preview() {
             onNewTag={() => undefined}
             onNewGroup={() => undefined}
             onEditTag={(id) => setEditTag(tags.find((tag) => tag.id === id) ?? null)}
-            onEditGroup={(id) => setEditGroup(groups.find((group) => group.id === id) ?? null)}
+            onGroupRename={async () => undefined}
+            onGroupColor={async () => undefined}
+            onGroupMove={async () => undefined}
+            onGroupDelete={async () => undefined}
+            onPin={() => undefined}
+            onReorderPinned={() => undefined}
             onDropBookmarks={() => undefined}
             onMoveTagToGroup={() => undefined}
           />
@@ -185,22 +187,8 @@ function Preview() {
         onClose={() => setEditTag(null)}
         onRename={async () => undefined}
         onColor={async () => undefined}
-        onPin={async () => undefined}
         onSetGroup={async () => undefined}
         onMerge={async () => undefined}
-        onDelete={async () => undefined}
-      />
-
-      <GroupDetailDialog
-        open={Boolean(editGroup)}
-        group={editGroup}
-        tagCount={tags.filter((tag) => tag.groupId === editGroup?.id).length}
-        index={0}
-        total={groups.length}
-        onClose={() => setEditGroup(null)}
-        onRename={async () => undefined}
-        onColor={async () => undefined}
-        onMove={async () => undefined}
         onDelete={async () => undefined}
       />
 

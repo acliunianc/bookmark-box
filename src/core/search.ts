@@ -35,6 +35,65 @@ export function parseQuery(query: string): ParsedQuery {
   return { keywords, tagIds, folder }
 }
 
+/** 光标处正在输入的「可补全 token」：`#标签` 或 `in:文件夹` */
+export interface ActiveSuggestToken {
+  kind: 'tag' | 'folder'
+  /** 已输入的过滤词（不含 `#` / `in:`） */
+  filter: string
+  /** token 在整段 query 里的起止下标（含前缀，不含尾部空格） */
+  start: number
+  end: number
+  /** 原始前缀，保留用户大小写（如 `IN:`） */
+  prefix: string
+}
+
+/**
+ * 根据光标位置找出当前可补全的 token。
+ * 只认「从最近空白到光标」这一段，这样编辑中间某个 `#xxx` 时也能弹出建议。
+ */
+export function getActiveSuggestToken(query: string, caret = query.length): ActiveSuggestToken | null {
+  const safeCaret = Math.max(0, Math.min(caret, query.length))
+  const before = query.slice(0, safeCaret)
+  const match = before.match(/(^|\s)([^\s]*)$/)
+  if (!match) return null
+  const token = match[2]
+  if (!token) return null
+  const start = safeCaret - token.length
+
+  if (token.startsWith('#')) {
+    return {
+      kind: 'tag',
+      filter: token.slice(1),
+      start,
+      end: safeCaret,
+      prefix: '#',
+    }
+  }
+
+  const folderMatch = token.match(/^(in:)(.*)$/i)
+  if (folderMatch) {
+    return {
+      kind: 'folder',
+      filter: folderMatch[2],
+      start,
+      end: safeCaret,
+      prefix: folderMatch[1],
+    }
+  }
+
+  return null
+}
+
+/** 用补全结果替换当前 token，并在后面补一个空格方便继续输入 */
+export function applySuggestToken(query: string, token: ActiveSuggestToken, insertion: string): string {
+  const before = query.slice(0, token.start)
+  const after = query.slice(token.end)
+  const spaced = after.startsWith(' ') || after.length === 0 ? `${insertion} ` : `${insertion} `
+  // after 若以空格开头，避免叠两个空格
+  const rest = after.replace(/^\s*/, '')
+  return `${before}${spaced}${rest}`
+}
+
 /* ---------------- MiniSearch 全文索引（中文按字 + 二元组切分） ---------------- */
 
 interface SearchDoc {

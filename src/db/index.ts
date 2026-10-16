@@ -6,7 +6,7 @@ interface SettingsRecord extends Settings {
   key: string
 }
 
-interface TagMarkDB extends DBSchema {
+interface BookmarkBoxDB extends DBSchema {
   bookmarks: {
     key: string
     value: Bookmark
@@ -42,11 +42,12 @@ interface TagMarkDB extends DBSchema {
   }
 }
 
-let dbPromise: Promise<IDBPDatabase<TagMarkDB>> | null = null
+let dbPromise: Promise<IDBPDatabase<BookmarkBoxDB>> | null = null
 
-export function getDB(): Promise<IDBPDatabase<TagMarkDB>> {
+export function getDB(): Promise<IDBPDatabase<BookmarkBoxDB>> {
   if (!dbPromise) {
-    dbPromise = openDB<TagMarkDB>('tagmark', 2, {
+    // 库名沿用 tagmark，避免改名后本地已有数据「消失」
+    dbPromise = openDB<BookmarkBoxDB>('tagmark', 2, {
       upgrade(db, oldVersion) {
         if (oldVersion < 1) {
           const bookmarks = db.createObjectStore('bookmarks', { keyPath: 'id' })

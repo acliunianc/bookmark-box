@@ -19,7 +19,7 @@ export interface BrowserFolderInfo {
 export interface BrowserSyncInput {
   url: string
   title: string
-  /** TagMark 记录的浏览器书签 id */
+  /** BookmarkBox 记录的浏览器书签 id */
   existingId?: string
   mode: BrowserFolderMode
   /** 手动模式的目标文件夹 id */

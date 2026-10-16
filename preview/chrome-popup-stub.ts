@@ -22,7 +22,7 @@ chromeLike.tabs = {
 
 chromeLike.runtime = {
   ...(chromeLike.runtime as Record<string, unknown>),
-  id: 'tagmark-preview',
+  id: 'bookmarkbox-preview',
   getURL: (path: string) => `/${path}`,
   sendMessage: async (message: { type: string; payload: unknown }) => {
     if (message.type === 'page/context') {
