@@ -23,17 +23,17 @@ pnpm install
 # 开发：启动带 HMR 的构建，chrome://extensions 加载 dist 目录（开发模式）
 pnpm dev
 
-# 生产构建 + 类型检查
+# 生产构建 + 类型检查，并按 package.json 的 name、version 打包 release/<name>-<version>.zip
 pnpm build
 ```
 
 加载方式：打开 `chrome://extensions` → 打开「开发者模式」→「加载已解压的扩展程序」→ 选择
-`dist` 目录。首次安装会自动打开管理页。
+`dist` 目录。也可以把 `release/` 里生成的 `<name>-<version>.zip` 拖进该页面安装。首次安装会自动打开管理页。
 
 | 命令              | 说明                             |
 | ----------------- | -------------------------------- |
 | `pnpm dev`        | 开发模式（CRXJS HMR）            |
-| `pnpm build`      | 类型检查 + 生产构建到 `dist/`    |
+| `pnpm build`      | 类型检查 + 生产构建到 `dist/`，并打包 `release/<name>-<version>.zip` |
 | `pnpm typecheck`  | 仅类型检查（`tsc --noEmit`）     |
 | `pnpm preview:ui` | 浏览器里单独预览标签区 / 列表组件（不参与扩展构建） |
 
