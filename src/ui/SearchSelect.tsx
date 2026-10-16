@@ -16,8 +16,8 @@ export interface SearchSelectOption {
   shape?: 'dot' | 'square'
   /** 右侧附加信息，如使用次数 */
   meta?: ReactNode
-  /** 左侧缩进（px），用于展示层级 */
-  indent?: number
+  /** 名称下方的辅助说明，如文件夹的父级路径 */
+  description?: string
 }
 
 interface SearchSelectProps {
@@ -156,24 +156,33 @@ export function SearchSelect({
         >
           {filtered.map((option) => (
             <ListBox.Item key={option.id} id={option.id} textValue={optionText(option)}>
-              <span
-                className="flex min-w-0 items-center gap-2"
-                style={option.indent ? { paddingLeft: option.indent } : undefined}
-              >
-                {option.color ? (
+              <span className="flex min-w-0 flex-1 flex-col">
+                <span className="flex min-w-0 items-center gap-2">
+                  {option.color ? (
+                    <span
+                      className={cn(
+                        'size-2 shrink-0',
+                        option.shape === 'square' ? 'rounded-sm' : 'rounded-full',
+                      )}
+                      style={{ backgroundColor: option.color }}
+                      aria-hidden="true"
+                    />
+                  ) : null}
+                  <span className="truncate">{option.label}</span>
+                  {option.meta != null ? (
+                    <span className="ms-auto shrink-0 text-xs text-[var(--muted)] tabular-nums">
+                      {option.meta}
+                    </span>
+                  ) : null}
+                </span>
+                {option.description ? (
                   <span
                     className={cn(
-                      'size-2 shrink-0',
-                      option.shape === 'square' ? 'rounded-sm' : 'rounded-full',
+                      'truncate text-xs text-[var(--muted)]',
+                      option.color && 'ps-4',
                     )}
-                    style={{ backgroundColor: option.color }}
-                    aria-hidden="true"
-                  />
-                ) : null}
-                <span className="truncate">{option.label}</span>
-                {option.meta != null ? (
-                  <span className="ms-auto shrink-0 text-xs text-[var(--muted)] tabular-nums">
-                    {option.meta}
+                  >
+                    {option.description}
                   </span>
                 ) : null}
               </span>
