@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { send, type BrowserFolderInfo } from '../shared/messages'
 import type { BrowserFolder, BrowserFolderMode } from '../shared/types'
 import { SearchSelect, type SearchSelectOption } from './SearchSelect'
@@ -67,16 +67,19 @@ export function BrowserPlacementSelect({
   const autoLabel = auto ? `自动 · 最顶层（${auto.path}）` : '自动 · 最顶层'
   const selectedKey = mode === 'auto' ? AUTO_KEY : folderId || null
 
-  const options: SearchSelectOption[] = [
-    { id: AUTO_KEY, label: autoLabel },
-    ...folders.map((folder) => ({
-      id: folder.id,
-      label: folder.name,
-      // 按完整路径搜索，同名文件夹可以靠父级路径区分
-      textValue: folder.path,
-      indent: folder.depth * 12,
-    })),
-  ]
+  const options = useMemo<SearchSelectOption[]>(
+    () => [
+      { id: AUTO_KEY, label: autoLabel },
+      ...folders.map((folder) => ({
+        id: folder.id,
+        label: folder.name,
+        // 按完整路径搜索，同名文件夹可以靠父级路径区分
+        textValue: folder.path,
+        indent: folder.depth * 12,
+      })),
+    ],
+    [autoLabel, folders],
+  )
 
   return (
     <SearchSelect
