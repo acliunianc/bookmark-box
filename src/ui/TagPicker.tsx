@@ -13,6 +13,8 @@ interface TagPickerProps {
   placeholder?: string
   /** 外部已有「未选择标签」占位时可关掉内部占位 */
   hideEmptyHint?: boolean
+  /** 外部已经展示已选标签时，不再在输入框下方重复渲染 */
+  hideSelected?: boolean
 }
 
 const CREATE_KEY = '__bookmarkbox_create__'
@@ -25,6 +27,7 @@ export function TagPicker({
   onCreate,
   placeholder = '搜索标签，回车即新建',
   hideEmptyHint = false,
+  hideSelected = false,
 }: TagPickerProps) {
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState(false)
@@ -158,31 +161,35 @@ export function TagPicker({
         ) : null}
       </div>
 
-      <div className="flex min-h-[26px] flex-wrap items-center gap-1.5">
-        {selectedIds.length === 0 ? (
-          hideEmptyHint ? null : <span className="text-xs text-[var(--muted)]">未选择标签</span>
-        ) : (
-          <TagGroup aria-label="已选标签" onRemove={removeKeys}>
-            <TagGroup.List className="flex flex-wrap items-center gap-1.5">
-              {selectedIds.map((id) => {
-                const tag = tagById.get(id)
-                return (
-                  <Tag key={id} id={id} textValue={tag?.name ?? id}>
-                    <span
-                      className="size-1.5 shrink-0 rounded-full"
-                      style={{ backgroundColor: tag?.color }}
-                      aria-hidden="true"
-                    />
-                    {tag?.name ?? id}
-                    <Tag.RemoveButton />
-                  </Tag>
-                )
-              })}
-            </TagGroup.List>
-          </TagGroup>
-        )}
-        {busy ? <span className="text-xs text-[var(--muted)]">创建中…</span> : null}
-      </div>
+      {hideSelected ? (
+        busy ? <span className="text-xs text-[var(--muted)]">创建中…</span> : null
+      ) : (
+        <div className="flex min-h-[26px] flex-wrap items-center gap-1.5">
+          {selectedIds.length === 0 ? (
+            hideEmptyHint ? null : <span className="text-xs text-[var(--muted)]">未选择标签</span>
+          ) : (
+            <TagGroup aria-label="已选标签" onRemove={removeKeys}>
+              <TagGroup.List className="flex flex-wrap items-center gap-1.5">
+                {selectedIds.map((id) => {
+                  const tag = tagById.get(id)
+                  return (
+                    <Tag key={id} id={id} textValue={tag?.name ?? id}>
+                      <span
+                        className="size-1.5 shrink-0 rounded-full"
+                        style={{ backgroundColor: tag?.color }}
+                        aria-hidden="true"
+                      />
+                      {tag?.name ?? id}
+                      <Tag.RemoveButton />
+                    </Tag>
+                  )
+                })}
+              </TagGroup.List>
+            </TagGroup>
+          )}
+          {busy ? <span className="text-xs text-[var(--muted)]">创建中…</span> : null}
+        </div>
+      )}
     </div>
   )
 }

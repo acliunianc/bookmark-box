@@ -47,7 +47,7 @@ function OptionIcon({ name }: { name?: SearchSelectOption['icon'] }) {
 function matchesQuery(option: SearchSelectOption, query: string) {
   const keyword = query.trim().toLowerCase()
   if (!keyword) return true
-  return `${option.label}\n${option.textValue ?? ''}`.toLowerCase().includes(keyword)
+  return `${option.label}\n${option.textValue ?? ''}\n${option.description ?? ''}`.toLowerCase().includes(keyword)
 }
 
 /**
@@ -140,7 +140,10 @@ export function SearchSelect({
         </Select.Value>
         <Select.Indicator />
       </Select.Trigger>
-      <Select.Popover>
+      <Select.Popover
+        className="overflow-x-hidden"
+        style={{ width: 'var(--trigger-width)', maxWidth: 'var(--trigger-width)' }}
+      >
         <div className="border-b border-[var(--separator)] p-1.5">
           <div className="relative">
             <IconSearch className="pointer-events-none absolute start-2.5 top-1/2 z-10 -translate-y-1/2 text-[var(--field-placeholder)]" />

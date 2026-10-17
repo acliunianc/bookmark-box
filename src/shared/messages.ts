@@ -26,6 +26,20 @@ export interface PageContext {
   frequentTagIds: string[]
   /** 上次使用的标签组合 */
   lastTagIds: string[]
+  /** 当前页已经在的书签文件夹（浏览器书签或导入路径）；没有则为 null */
+  folderPath: string | null
+  /** 导入时保存的逐文件夹处理方式；旧数据没有时为空 */
+  folderModes: Record<string, FolderMode>
+  /** 导入时是否按文件夹生成标签；旧数据缺省为开启 */
+  folderAutoTag: boolean
+}
+
+/** 收藏弹窗里用来复制标签的书签摘要 */
+export interface BookmarkSummary {
+  id: string
+  title: string
+  url: string
+  tagIds: string[]
 }
 
 export interface BootstrapData {
@@ -84,6 +98,16 @@ export interface RequestMap {
   'data/bootstrap': { req: Record<string, never>; res: BootstrapData }
   /** 本机浏览器书签的文件夹树（仅文件夹，用于同步落点选择） */
   'browser/folders': { req: Record<string, never>; res: BrowserFolderInfo }
+  /** 未删除书签的摘要，供收藏弹窗复制标签 */
+  'bookmark/summaries': { req: Record<string, never>; res: { bookmarks: BookmarkSummary[] } }
+  /**
+   * 按导入时保存的文件夹配置，为这条路径生成（或复用）对应标签。
+   * 分组方式会一并归组；不生成标签的层会被跳过。
+   */
+  'tag/fromFolder': {
+    req: { path: string }
+    res: { tagIds: string[]; tags: Tag[] }
+  }
 
   'bookmark/save': {
     req: {

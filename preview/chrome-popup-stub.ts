@@ -46,6 +46,52 @@ chromeLike.runtime = {
           },
           frequentTagIds: ['java', '前端', '待读'],
           lastTagIds: ['java', 'react'],
+          folderPath: '书签栏/开发工具/前端',
+          folderModes: {},
+          folderAutoTag: true,
+        },
+      }
+    }
+    if (message.type === 'bookmark/summaries') {
+      return {
+        ok: true,
+        data: {
+          bookmarks: [
+            {
+              id: 'b1',
+              title: 'Spring Boot 官方文档',
+              url: 'https://spring.io/projects/spring-boot',
+              tagIds: ['java', '前端'],
+            },
+            {
+              id: 'b2',
+              title: 'MDN Web Docs',
+              url: 'https://developer.mozilla.org',
+              tagIds: ['待读'],
+            },
+          ],
+        },
+      }
+    }
+    if (message.type === 'tag/fromFolder') {
+      const path = (message.payload as { path?: string }).path ?? ''
+      const names = path.split('/').filter(Boolean)
+      const extra = names
+        .filter((name) => !TAGS.some((tag) => tag.name === name))
+        .map((name) => ({
+          id: name,
+          name,
+          color: '#eab308',
+          useCount: 0,
+          lastUsedAt: 0,
+          pinned: false,
+        }))
+      const tags = [...TAGS, ...extra]
+      return {
+        ok: true,
+        data: {
+          tagIds: names,
+          tags,
         },
       }
     }

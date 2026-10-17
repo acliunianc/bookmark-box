@@ -62,6 +62,13 @@ export interface TreeSnapshot {
   source: 'browser' | 'html'
   importedAt: number
   root: FolderNode
+  /**
+   * 导入时逐文件夹的处理方式。只记录被改过的路径，缺省即「标签」。
+   * 收藏弹窗勾选「按文件夹配置打标签」时沿用这份配置。
+   */
+  folderModes?: Record<string, FolderMode>
+  /** 导入时是否按文件夹生成标签；缺省视为开启 */
+  folderAutoTag?: boolean
 }
 
 export interface Settings {

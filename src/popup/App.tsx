@@ -1,13 +1,15 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Button, Checkbox, Input, Spinner, TextField } from '@heroui/react'
 import { tagIdOf } from '../shared/constants'
-import { send, type PageContext } from '../shared/messages'
+import { send, type BookmarkSummary, type PageContext } from '../shared/messages'
+import { folderTagPlan } from '../core/parseTree'
 import type { BrowserFolderMode, Tag } from '../shared/types'
 import { isSpecialPage } from '../core/normalizeUrl'
 import { relativeTime } from '../shared/utils'
 import { cn } from '../ui/cn'
 import { Favicon } from '../ui/Favicon'
 import { BrowserPlacementSelect, useBrowserFolders } from '../ui/BrowserFolderSelect'
+import { SearchSelect } from '../ui/SearchSelect'
 import { TagChip } from '../ui/TagChip'
 import { IconBolt, IconCheck, IconEdit, IconPlus, IconTrash } from '../ui/icons'
 import { useToast } from '../ui/toast'
@@ -36,6 +38,11 @@ export function PopupApp() {
   const [syncToBrowser, setSyncToBrowser] = useState(true)
   /* 浏览器书签落点：默认「自动（最顶层）」 */
   const [placement, setPlacement] = useState<Placement>({ mode: 'auto', folderId: '' })
+  const [summaries, setSummaries] = useState<BookmarkSummary[]>([])
+  const [copySourceId, setCopySourceId] = useState<string | null>(null)
+  const [applyFolderTags, setApplyFolderTags] = useState(false)
+  /* 勾选文件夹标签时加上的 id，取消勾选或换文件夹时只撤掉这一批 */
+  const appliedFolderTags = useRef<string[]>([])
 
   /* 1. 打开时并行解析当前标签页并拉取上下文 */
   useEffect(() => {
@@ -46,8 +53,12 @@ export function PopupApp() {
         const url = tab?.url ?? ''
         const title = tab?.title ?? url
         if (!url) throw new Error('未取到当前页地址')
-        const context = await send('page/context', { url, title })
+        const [context, listed] = await Promise.all([
+          send('page/context', { url, title }),
+          send('bookmark/summaries', {}).catch(() => ({ bookmarks: [] as BookmarkSummary[] })),
+        ])
         if (cancelled) return
+        setSummaries(listed.bookmarks ?? [])
         setState({
           url,
           title: context.bookmark?.title ?? title,
@@ -76,6 +87,73 @@ export function PopupApp() {
 
   const frequent = (state?.context.frequentTagIds ?? []).map((id) => tagById.get(id)).filter(Boolean) as Tag[]
   const lastUsed = (state?.context.lastTagIds ?? []).map((id) => tagById.get(id)).filter(Boolean) as Tag[]
+
+  /* 优先用当前页已经在的文件夹；没有时用这次选择的放置位置 */
+  const folderPath = useMemo(() => {
+    const located = state?.context.folderPath || null
+    if (located) return located
+    if (!syncToBrowser) return null
+    if (placement.mode === 'manual') {
+      return browserFolders.folders.find((folder) => folder.id === placement.folderId)?.path ?? null
+    }
+    return browserFolders.auto?.path ?? null
+  }, [browserFolders.auto, browserFolders.folders, placement.folderId, placement.mode, state, syncToBrowser])
+
+  const folderPlan = useMemo(
+    () =>
+      folderPath
+        ? folderTagPlan(folderPath, state?.context.folderModes ?? {}, state?.context.folderAutoTag !== false)
+        : [],
+    [folderPath, state],
+  )
+
+  const bookmarkOptions = useMemo(
+    () =>
+      (summaries ?? []).map((item) => ({
+        id: item.id,
+        label: item.title,
+        description: item.url.replace(/^https?:\/\//, ''),
+        textValue: item.title,
+      })),
+    [summaries],
+  )
+
+  /* 勾选期间，文件夹路径变了就换成新路径对应的标签 */
+  useEffect(() => {
+    if (!applyFolderTags) return undefined
+    if (!folderPath) {
+      const remove = new Set(appliedFolderTags.current)
+      appliedFolderTags.current = []
+      setApplyFolderTags(false)
+      setState((prev) =>
+        prev ? { ...prev, tagIds: prev.tagIds.filter((id) => !remove.has(id)) } : prev,
+      )
+      return undefined
+    }
+    let cancelled = false
+    const previous = appliedFolderTags.current
+    void send('tag/fromFolder', { path: folderPath })
+      .then((result) => {
+        if (cancelled) return
+        appliedFolderTags.current = result.tagIds
+        const remove = new Set(previous)
+        setState((prev) => {
+          if (!prev) return prev
+          const kept = prev.tagIds.filter((id) => !remove.has(id))
+          return {
+            ...prev,
+            tagIds: [...new Set([...kept, ...result.tagIds])],
+            context: { ...prev.context, tags: result.tags },
+          }
+        })
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) toast.danger(err instanceof Error ? err.message : String(err))
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [applyFolderTags, folderPath, toast])
 
   if (error) {
     return (
@@ -166,8 +244,35 @@ export function PopupApp() {
     window.close()
   }
 
+  const toggleFolderTags = (checked: boolean) => {
+    if (checked) {
+      setApplyFolderTags(true)
+      return
+    }
+    const remove = new Set(appliedFolderTags.current)
+    appliedFolderTags.current = []
+    setApplyFolderTags(false)
+    setTagIds(state.tagIds.filter((id) => !remove.has(id)))
+  }
+
+  const copyTagsFrom = (id: string) => {
+    setCopySourceId(id)
+    const source = summaries.find((item) => item.id === id)
+    if (!source || source.tagIds.length === 0) {
+      toast.danger('这条书签还没有标签')
+      return
+    }
+    setTagIds([...new Set([...state.tagIds, ...source.tagIds])])
+  }
+
+  const folderHint = !folderPath
+    ? '没有可套用的文件夹'
+    : folderPlan.length === 0
+      ? `「${folderPath.replaceAll('/', ' / ')}」按当前配置不会生成标签`
+      : `${state.context.folderPath ? '当前页在' : '按放置位置'}「${folderPath.replaceAll('/', ' / ')}」，将加上 ${folderPlan.map((entry) => entry.name).join('、')}`
+
   return (
-    <main className="flex h-[540px] w-[380px] flex-col gap-3 overflow-y-auto p-4">
+    <main className="flex h-[600px] w-[380px] flex-col gap-3 overflow-y-auto p-4">
       {/* 标题 / URL */}
       <header className="flex items-start gap-3">
         <Favicon url={state.url} size={32} className="mt-0.5 rounded-md" />
@@ -246,6 +351,33 @@ export function PopupApp() {
           onCreate={createTag}
           placeholder="搜索标签，回车即新建"
           hideEmptyHint
+          hideSelected
+        />
+      </section>
+
+      <section className="flex flex-col gap-2">
+        <Checkbox
+          aria-label="按文件夹配置打标签"
+          isSelected={applyFolderTags}
+          isDisabled={!folderPath || folderPlan.length === 0}
+          onChange={toggleFolderTags}
+        >
+          <Checkbox.Content className="text-xs">
+            <Checkbox.Control>
+              <Checkbox.Indicator />
+            </Checkbox.Control>
+            按文件夹配置打标签
+          </Checkbox.Content>
+        </Checkbox>
+        <p className="text-xs text-[var(--muted)]">{folderHint}</p>
+        <SearchSelect
+          aria-label="复制书签标签"
+          className="w-full"
+          value={copySourceId}
+          onChange={copyTagsFrom}
+          options={bookmarkOptions}
+          placeholder="选择书签，复制它的标签"
+          isDisabled={bookmarkOptions.length === 0}
         />
       </section>
 

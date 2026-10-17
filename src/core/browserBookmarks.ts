@@ -128,6 +128,16 @@ async function resolveTargetFolder(
   return auto ?? undefined
 }
 
+/** 当前页在本机浏览器书签里所在的文件夹路径；不在任何文件夹里时返回 null */
+export async function locateBookmarkFolderPath(url: string): Promise<string | null> {
+  if (!supportsBrowserBookmarks() || !url) return null
+  const matches = await chrome.bookmarks.search({ url }).catch(() => [])
+  const hit = matches.find((node) => !!node.url)
+  if (!hit) return null
+  const path = await folderPathOf(hit.parentId)
+  return path || null
+}
+
 /** 精确按 URL 找已存在的浏览器书签，避免重复创建 */
 async function findByUrl(url: string): Promise<chrome.bookmarks.BookmarkTreeNode | undefined> {
   const matches = await chrome.bookmarks.search({ url }).catch(() => [])

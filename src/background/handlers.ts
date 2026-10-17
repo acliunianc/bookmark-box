@@ -9,6 +9,7 @@ import {
   type ParseResult,
 } from '../core/parseTree'
 import {
+  locateBookmarkFolderPath,
   readBrowserFolders,
   removeBrowserBookmark,
   supportsBrowserBookmarks,
@@ -72,6 +73,10 @@ async function handlePageContext(payload: { url: string; title: string }): Promi
     .slice(0, 6)
     .map((tag) => tag.id)
 
+  const tree = await db.getTreeSnapshot()
+  const located = await locateBookmarkFolderPath(payload.url)
+  const imported = bookmark?.importPaths.find((path) => path.trim()) ?? null
+
   return {
     url: payload.url,
     title: payload.title || payload.url,
@@ -80,6 +85,9 @@ async function handlePageContext(payload: { url: string; title: string }): Promi
     settings,
     frequentTagIds,
     lastTagIds: settings.lastTagIds.filter((id) => tags.some((tag) => tag.id === id)),
+    folderPath: located || imported,
+    folderModes: tree?.folderModes ?? {},
+    folderAutoTag: tree?.folderAutoTag !== false,
   }
 }
 
@@ -465,6 +473,8 @@ async function applyParsed(parsed: ApplyInput, options: TreeApplyOptions): Promi
     source: parsed.source,
     importedAt: Date.now(),
     root: parsed.root,
+    folderModes: { ...folderModes },
+    folderAutoTag: options.autoTag !== false,
   }
   await db.putTreeSnapshot(snapshot)
 
@@ -697,10 +707,64 @@ async function handleSnapshotRestore(id: number): Promise<{ ok: true }> {
 
 /* ------------------------------------------------------------------ */
 
+async function handleBookmarkSummaries(): Promise<{
+  bookmarks: { id: string; title: string; url: string; tagIds: string[] }[]
+}> {
+  const bookmarks = await db.allBookmarks()
+  return {
+    bookmarks: bookmarks
+      .map((bookmark) => ({
+        id: bookmark.id,
+        title: bookmark.title || bookmark.url,
+        url: bookmark.url,
+        tagIds: bookmark.tagIds,
+      }))
+      .sort((a, b) => a.title.localeCompare(b.title, 'zh')),
+  }
+}
+
+/** 按已保存的文件夹配置生成标签，并在需要时归入分组 */
+async function handleTagsFromFolder(payload: { path: string }): Promise<{ tagIds: string[]; tags: Tag[] }> {
+  const tree = await db.getTreeSnapshot()
+  const plan = folderTagPlan(payload.path, tree?.folderModes ?? {}, tree?.folderAutoTag !== false)
+  if (plan.length === 0) return { tagIds: [], tags: sortTags(await db.allTags()) }
+
+  let tags = await db.allTags()
+  let groups = await db.allGroups()
+  let tagsDirty = false
+  let groupsDirty = false
+  const tagIds: string[] = []
+
+  for (const entry of plan) {
+    const created = createTag(tags, entry.name)
+    tags = created.tags
+    if (!created.existed) tagsDirty = true
+
+    let tag = created.tag
+    if (entry.groupName) {
+      const createdGroup = createGroup(groups, entry.groupName)
+      groups = createdGroup.groups
+      if (!createdGroup.existed) groupsDirty = true
+      if (tag.groupId !== createdGroup.group.id) {
+        tag = { ...tag, groupId: createdGroup.group.id }
+        tags = tags.map((existing) => (existing.id === tag.id ? tag : existing))
+        tagsDirty = true
+      }
+    }
+    tagIds.push(tag.id)
+  }
+
+  if (groupsDirty) await db.putGroups(groups)
+  if (tagsDirty) await db.putTags(tags)
+  return { tagIds: [...new Set(tagIds)], tags: sortTags(tagsDirty ? tags : await db.allTags()) }
+}
+
 export const handlers = {
   'page/context': handlePageContext,
   'data/bootstrap': handleBootstrap,
   'browser/folders': async () => readBrowserFolders(),
+  'bookmark/summaries': handleBookmarkSummaries,
+  'tag/fromFolder': handleTagsFromFolder,
   'bookmark/save': handleSaveBookmark,
   'bookmark/delete': handleBookmarkDelete,
   'bookmark/restore': handleBookmarkRestore,
