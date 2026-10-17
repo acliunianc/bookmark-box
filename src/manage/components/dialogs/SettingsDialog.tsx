@@ -56,10 +56,33 @@ export function SettingsDialog({
     }
   }
 
+  const refreshShortcuts = () => {
+    void chrome.commands.getAll().then(setShortcuts).catch(() => setShortcuts([]))
+  }
+
+  /** 全局快捷键只能在浏览器自己的快捷键页里改，扩展没有写入接口 */
+  const openShortcutPage = async () => {
+    const url = /Edg\//.test(navigator.userAgent)
+      ? 'edge://extensions/shortcuts'
+      : 'chrome://extensions/shortcuts'
+    try {
+      await chrome.tabs.create({ url })
+    } catch {
+      try {
+        await navigator.clipboard.writeText(url)
+        toast.success(`已复制 ${url}`, { description: '请粘贴到地址栏后回车，在 BookmarkBox 一行里指定按键' })
+      } catch {
+        toast.danger(`请在地址栏打开 ${url}，找到 BookmarkBox 后指定按键`)
+      }
+    }
+  }
+
   useEffect(() => {
     if (!open) return
     void loadSnapshots()
-    void chrome.commands.getAll().then(setShortcuts).catch(() => setShortcuts([]))
+    refreshShortcuts()
+    window.addEventListener('focus', refreshShortcuts)
+    return () => window.removeEventListener('focus', refreshShortcuts)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
 
@@ -112,7 +135,12 @@ export function SettingsDialog({
       >
         <div className="flex flex-col gap-6">
           <section className="flex flex-col gap-2">
-            <h3 className="text-sm font-medium">快捷键</h3>
+            <div className="flex items-center justify-between gap-3">
+              <h3 className="text-sm font-medium">快捷键</h3>
+              <Button size="sm" variant="primary" onPress={() => void openShortcutPage()}>
+                指定快捷键
+              </Button>
+            </div>
             <ul className="rounded-[var(--radius)] border border-[var(--border)]">
               {shortcuts.length === 0 ? (
                 <li className="px-3 py-2 text-xs text-[var(--muted)]">当前环境读不到快捷键</li>
@@ -131,7 +159,7 @@ export function SettingsDialog({
               )}
             </ul>
             <p className="text-xs text-[var(--muted)]">
-              在地址栏打开 chrome://extensions/shortcuts，找到 BookmarkBox 即可修改。默认「打开管理页」是 Alt+Shift+M；若与浏览器快捷键冲突，需要在该页重新指定。
+              点「指定快捷键」会打开浏览器的扩展快捷键页。在 BookmarkBox 那一行里改按键；改完回到这里会显示最新结果。默认「打开管理页」是 Alt+Shift+M，和浏览器快捷键冲突时要在该页重设。
             </p>
           </section>
 
