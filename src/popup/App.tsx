@@ -11,7 +11,7 @@ import { Favicon } from '../ui/Favicon'
 import { BrowserPlacementSelect, useBrowserFolders } from '../ui/BrowserFolderSelect'
 import { SearchSelect } from '../ui/SearchSelect'
 import { TagChip } from '../ui/TagChip'
-import { IconBolt, IconCheck, IconEdit, IconPlus, IconTrash } from '../ui/icons'
+import { IconBolt, IconCheck, IconPlus, IconTrash } from '../ui/icons'
 import { useToast } from '../ui/toast'
 import { TagPicker } from '../ui/TagPicker'
 
@@ -33,7 +33,6 @@ export function PopupApp() {
   const [state, setState] = useState<LoadedState | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
-  const [editingTitle, setEditingTitle] = useState(false)
   /* 是否同步写入本机浏览器书签（默认取设置，设置里默认开启） */
   const [syncToBrowser, setSyncToBrowser] = useState(true)
   /* 浏览器书签落点：默认「自动（最顶层）」 */
@@ -275,43 +274,21 @@ export function PopupApp() {
     <main className="flex h-[600px] w-[380px] flex-col gap-3 overflow-y-auto p-4">
       {/* 标题 / URL */}
       <header className="flex items-start gap-3">
-        <Favicon url={state.url} size={32} className="mt-0.5 rounded-md" />
+        <Favicon url={state.url} size={32} className="mt-1 rounded-md" />
         <div className="min-w-0 flex-1">
-          {editingTitle ? (
-            <TextField
-              aria-label="书签标题"
-              className="w-full"
-              fullWidth
-              value={state.title}
-              onChange={(value) => setState((prev) => (prev ? { ...prev, title: value } : prev))}
-            >
-              <Input
-                autoFocus
-                onBlur={() => setEditingTitle(false)}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter') setEditingTitle(false)
-                }}
-              />
-            </TextField>
-          ) : (
-            <h1 className="truncate text-sm font-semibold" title={state.title}>
-              {state.title}
-            </h1>
-          )}
-          <p className="mt-0.5 truncate text-xs text-[var(--muted)]" title={state.url}>
+          <TextField
+            aria-label="书签标题"
+            className="w-full"
+            fullWidth
+            value={state.title}
+            onChange={(value) => setState((prev) => (prev ? { ...prev, title: value } : prev))}
+          >
+            <Input placeholder="书签标题" />
+          </TextField>
+          <p className="mt-1 truncate text-xs text-[var(--muted)]" title={state.url}>
             {state.url.replace(/^https?:\/\//, '')}
           </p>
         </div>
-        <Button
-          size="sm"
-          isIconOnly
-          variant="ghost"
-          className="size-7 min-h-0 min-w-0 shrink-0 rounded-md p-0 text-[var(--muted)]"
-          aria-label="编辑标题"
-          onPress={() => setEditingTitle(true)}
-        >
-          <IconEdit width={15} height={15} />
-        </Button>
       </header>
 
       {special ? (
@@ -355,31 +332,15 @@ export function PopupApp() {
         />
       </section>
 
-      <section className="flex flex-col gap-2">
-        <Checkbox
-          aria-label="按文件夹配置打标签"
-          isSelected={applyFolderTags}
-          isDisabled={!folderPath || folderPlan.length === 0}
-          onChange={toggleFolderTags}
-        >
-          <Checkbox.Content className="text-xs">
-            <Checkbox.Control>
-              <Checkbox.Indicator />
-            </Checkbox.Control>
-            按文件夹配置打标签
-          </Checkbox.Content>
-        </Checkbox>
-        <p className="text-xs text-[var(--muted)]">{folderHint}</p>
-        <SearchSelect
-          aria-label="复制书签标签"
-          className="w-full"
-          value={copySourceId}
-          onChange={copyTagsFrom}
-          options={bookmarkOptions}
-          placeholder="选择书签，复制它的标签"
-          isDisabled={bookmarkOptions.length === 0}
-        />
-      </section>
+      <SearchSelect
+        aria-label="复制书签标签"
+        className="w-full"
+        value={copySourceId}
+        onChange={copyTagsFrom}
+        options={bookmarkOptions}
+        placeholder="选择书签，复制它的标签"
+        isDisabled={bookmarkOptions.length === 0}
+      />
 
       {/* 常用 / 上次 */}
       <section className="flex flex-col gap-2 text-xs">
@@ -413,8 +374,24 @@ export function PopupApp() {
         ) : null}
       </section>
 
-      {/* 浏览器书签同步（默认开启，落点默认「自动 · 最顶层」） */}
-      <section className="flex flex-col gap-2 rounded-[var(--field-radius)] border border-[var(--border)] p-2">
+      {/* 按文件夹打标签，以及同步进浏览器书签（落点默认「自动 · 最顶层」） */}
+      <section className="flex flex-col gap-1.5 rounded-[var(--field-radius)] border border-[var(--border)] p-2">
+        <Checkbox
+          aria-label="按文件夹配置打标签"
+          isSelected={applyFolderTags}
+          isDisabled={!folderPath || folderPlan.length === 0}
+          onChange={toggleFolderTags}
+        >
+          <Checkbox.Content className="text-xs">
+            <Checkbox.Control>
+              <Checkbox.Indicator />
+            </Checkbox.Control>
+            按文件夹配置打标签
+          </Checkbox.Content>
+        </Checkbox>
+        <p className="-mt-1 ps-6 text-xs leading-4 text-[var(--muted)]" title={folderHint}>
+          {folderHint}
+        </p>
         <Checkbox
           aria-label="同步加入到浏览器书签"
           isSelected={syncToBrowser}
