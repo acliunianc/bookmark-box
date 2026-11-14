@@ -62,6 +62,7 @@ chromeLike.runtime = {
               title: 'Spring Boot 官方文档',
               url: 'https://spring.io/projects/spring-boot',
               tagIds: ['java', '前端'],
+              browserBookmarkId: 'bb-1',
             },
             {
               id: 'b2',
@@ -72,6 +73,14 @@ chromeLike.runtime = {
           ],
         },
       }
+    }
+    if (message.type === 'browser/siblingFolder') {
+      const payload = message.payload as { url?: string; browserBookmarkId?: string }
+      const folder =
+        payload.browserBookmarkId || payload.url?.includes('spring.io')
+          ? { id: '12', path: '书签栏/开发工具/前端' }
+          : null
+      return { ok: true, data: { folder } }
     }
     if (message.type === 'tag/fromFolder') {
       const path = (message.payload as { path?: string }).path ?? ''

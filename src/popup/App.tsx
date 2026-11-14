@@ -3,7 +3,7 @@ import { Button, Checkbox, Input, Spinner, TextField } from '@heroui/react'
 import { tagIdOf } from '../shared/constants'
 import { send, type BookmarkSummary, type PageContext } from '../shared/messages'
 import { folderTagPlan } from '../core/parseTree'
-import type { BrowserFolderMode, Tag } from '../shared/types'
+import type { BrowserFolderMode } from '../shared/types'
 import { isSpecialPage } from '../core/normalizeUrl'
 import { relativeTime } from '../shared/utils'
 import { cn } from '../ui/cn'
@@ -39,9 +39,20 @@ export function PopupApp() {
   const [placement, setPlacement] = useState<Placement>({ mode: 'auto', folderId: '' })
   const [summaries, setSummaries] = useState<BookmarkSummary[]>([])
   const [copySourceId, setCopySourceId] = useState<string | null>(null)
+  /* 把新书签放到所选书签的同级文件夹（勾选后，选中书签即切换落点） */
+  const [placeBesideSelected, setPlaceBesideSelected] = useState(false)
+  const [siblingFolder, setSiblingFolder] = useState<{ id: string; path: string } | null>(null)
+  const [siblingLoading, setSiblingLoading] = useState(false)
   const [applyFolderTags, setApplyFolderTags] = useState(false)
   /* 勾选文件夹标签时加上的 id，取消勾选或换文件夹时只撤掉这一批 */
   const appliedFolderTags = useRef<string[]>([])
+  /* 设置里的默认落点，清除书签等场景下还原到它 */
+  const defaultPlacement = useRef<Placement>({ mode: 'auto', folderId: '' })
+
+  /* 落点回到设置里的默认值（不动「同级」的勾选状态） */
+  const resetPlacement = () => {
+    setPlacement(defaultPlacement.current)
+  }
 
   /* 1. 打开时并行解析当前标签页并拉取上下文 */
   useEffect(() => {
@@ -65,10 +76,12 @@ export function PopupApp() {
           context,
         })
         setSyncToBrowser(context.settings.syncToBrowser)
-        setPlacement({
+        const initialPlacement = {
           mode: context.settings.browserFolderMode,
           folderId: context.settings.browserFolderId,
-        })
+        }
+        defaultPlacement.current = initialPlacement
+        setPlacement(initialPlacement)
       } catch (err) {
         if (!cancelled) setError(err instanceof Error ? err.message : String(err))
       }
@@ -83,9 +96,56 @@ export function PopupApp() {
   const tagById = useMemo(() => new Map(tags.map((tag) => [tag.id, tag])), [tags])
   /* 需要选择浏览器书签落点时，懒加载本机书签文件夹 */
   const browserFolders = useBrowserFolders(syncToBrowser)
+  const copySource = useMemo(
+    () => (copySourceId ? summaries.find((item) => item.id === copySourceId) ?? null : null),
+    [copySourceId, summaries],
+  )
+  const showBesideOption = syncToBrowser
 
-  const frequent = (state?.context.frequentTagIds ?? []).map((id) => tagById.get(id)).filter(Boolean) as Tag[]
-  const lastUsed = (state?.context.lastTagIds ?? []).map((id) => tagById.get(id)).filter(Boolean) as Tag[]
+  /* 选中书签后解析它在本机书签里的所在文件夹，供「同级」落点使用 */
+  useEffect(() => {
+    if (!copySource) {
+      setSiblingFolder(null)
+      setSiblingLoading(false)
+      return undefined
+    }
+    let cancelled = false
+    setSiblingFolder(null)
+    setSiblingLoading(true)
+    void send('browser/siblingFolder', {
+      url: copySource.url,
+      browserBookmarkId: copySource.browserBookmarkId,
+    })
+      .then((result) => {
+        if (cancelled) return
+        setSiblingFolder(result.folder)
+        // 换了书签却定位不到所在文件夹时，落点退回默认，避免沿用上一条书签的文件夹
+        if (!result.folder && placeBesideSelected) resetPlacement()
+      })
+      .catch(() => {
+        if (!cancelled) setSiblingFolder(null)
+      })
+      .finally(() => {
+        if (!cancelled) setSiblingLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [copySource, showBesideOption])
+
+  /* 勾选了「同级」：选中书签解析出文件夹后，把落点切到该文件夹 */
+  useEffect(() => {
+    if (!placeBesideSelected || !siblingFolder) return
+    setPlacement({ mode: 'manual', folderId: siblingFolder.id })
+  }, [placeBesideSelected, siblingFolder])
+
+  /* 关掉同步后，勾选项随之失效，落点退回默认 */
+  useEffect(() => {
+    if (!showBesideOption) {
+      setPlaceBesideSelected(false)
+      resetPlacement()
+    }
+  }, [showBesideOption])
 
   /* 优先用当前页已经在的文件夹；没有时用这次选择的放置位置 */
   const folderPath = useMemo(() => {
@@ -93,10 +153,21 @@ export function PopupApp() {
     if (located) return located
     if (!syncToBrowser) return null
     if (placement.mode === 'manual') {
-      return browserFolders.folders.find((folder) => folder.id === placement.folderId)?.path ?? null
+      return (
+        browserFolders.folders.find((folder) => folder.id === placement.folderId)?.path ??
+        (siblingFolder?.id === placement.folderId ? siblingFolder.path : null)
+      )
     }
     return browserFolders.auto?.path ?? null
-  }, [browserFolders.auto, browserFolders.folders, placement.folderId, placement.mode, state, syncToBrowser])
+  }, [
+    browserFolders.auto,
+    browserFolders.folders,
+    placement.folderId,
+    placement.mode,
+    siblingFolder,
+    state,
+    syncToBrowser,
+  ])
 
   const folderPlan = useMemo(
     () =>
@@ -255,6 +326,12 @@ export function PopupApp() {
   }
 
   const copyTagsFrom = (id: string) => {
+    if (!id) {
+      setCopySourceId(null)
+      setSiblingFolder(null)
+      resetPlacement()
+      return
+    }
     setCopySourceId(id)
     const source = summaries.find((item) => item.id === id)
     if (!source || source.tagIds.length === 0) {
@@ -332,66 +409,53 @@ export function PopupApp() {
         />
       </section>
 
-      <SearchSelect
-        aria-label="复制书签标签"
-        className="w-full"
-        value={copySourceId}
-        onChange={copyTagsFrom}
-        options={bookmarkOptions}
-        placeholder="选择书签，复制它的标签"
-        isDisabled={bookmarkOptions.length === 0}
-      />
-
-      {/* 常用 / 上次 */}
-      <section className="flex flex-col gap-2 text-xs">
-        {frequent.length > 0 ? (
-          <div className="flex flex-wrap items-center gap-1.5">
-            <span className="text-[var(--muted)]">常用</span>
-            {frequent.map((tag) => (
-              <TagChip
-                key={tag.id}
-                name={tag.name}
-                color={tag.color}
-                active={state.tagIds.includes(tag.id)}
-                onPress={() => toggleTag(tag.id)}
-              />
-            ))}
-          </div>
+      <div className="flex items-center gap-2">
+        <SearchSelect
+          aria-label="复制书签标签"
+          className="min-w-0 flex-1"
+          value={copySourceId}
+          onChange={copyTagsFrom}
+          onClear={() => {
+            setCopySourceId(null)
+            setSiblingFolder(null)
+            resetPlacement()
+          }}
+          isClearable
+          options={bookmarkOptions}
+          placeholder="选择书签，复制它的标签"
+          isDisabled={bookmarkOptions.length === 0}
+        />
+        {syncToBrowser ? (
+          <Checkbox
+            className="shrink-0"
+            aria-label="更新文件夹"
+            isSelected={placeBesideSelected}
+            onChange={(checked) => {
+              setPlaceBesideSelected(checked)
+              if (!checked) resetPlacement()
+            }}
+          >
+            <Checkbox.Content className="whitespace-nowrap text-xs">
+              <Checkbox.Control>
+                <Checkbox.Indicator />
+              </Checkbox.Control>
+              更新文件夹
+            </Checkbox.Content>
+          </Checkbox>
         ) : null}
-        {lastUsed.length > 0 ? (
-          <div className="flex flex-wrap items-center gap-1.5">
-            <span className="text-[var(--muted)]">上次</span>
-            {lastUsed.map((tag) => (
-              <TagChip
-                key={tag.id}
-                name={tag.name}
-                color={tag.color}
-                active={state.tagIds.includes(tag.id)}
-                onPress={() => toggleTag(tag.id)}
-              />
-            ))}
-          </div>
-        ) : null}
-      </section>
-
-      {/* 按文件夹打标签，以及同步进浏览器书签（落点默认「自动 · 最顶层」） */}
-      <section className="flex flex-col gap-1.5 rounded-[var(--field-radius)] border border-[var(--border)] p-2">
-        <Checkbox
-          aria-label="按文件夹配置打标签"
-          isSelected={applyFolderTags}
-          isDisabled={!folderPath || folderPlan.length === 0}
-          onChange={toggleFolderTags}
-        >
-          <Checkbox.Content className="text-xs">
-            <Checkbox.Control>
-              <Checkbox.Indicator />
-            </Checkbox.Control>
-            按文件夹配置打标签
-          </Checkbox.Content>
-        </Checkbox>
-        <p className="-mt-1 ps-6 text-xs leading-4 text-[var(--muted)]" title={folderHint}>
-          {folderHint}
+      </div>
+      {syncToBrowser && placeBesideSelected && (siblingLoading || !siblingFolder) ? (
+        <p className="-mt-1 text-xs leading-4 text-[var(--muted)]">
+          {!copySource
+            ? '选择一条书签后，自动切换到它所在的文件夹'
+            : siblingLoading
+              ? '正在查找所选书签所在文件夹…'
+              : '所选书签不在本机浏览器书签中，无法定位同级文件夹'}
         </p>
+      ) : null}
+
+      {/* 同步进浏览器书签（落点默认「自动 · 最顶层」），以及按文件夹打标签 */}
+      <section className="flex flex-col gap-1.5 rounded-[var(--field-radius)] border border-[var(--border)] p-2">
         <Checkbox
           aria-label="同步加入到浏览器书签"
           isSelected={syncToBrowser}
@@ -405,14 +469,32 @@ export function PopupApp() {
           </Checkbox.Content>
         </Checkbox>
         {syncToBrowser ? (
-          <BrowserPlacementSelect
-            className="w-full"
-            folders={browserFolders.folders}
-            auto={browserFolders.auto}
-            mode={placement.mode}
-            folderId={placement.folderId}
-            onChange={setPlacement}
-          />
+          <>
+            <Checkbox
+              aria-label="按文件夹配置打标签"
+              isSelected={applyFolderTags}
+              isDisabled={!folderPath || folderPlan.length === 0}
+              onChange={toggleFolderTags}
+            >
+              <Checkbox.Content className="text-xs">
+                <Checkbox.Control>
+                  <Checkbox.Indicator />
+                </Checkbox.Control>
+                按文件夹配置打标签
+              </Checkbox.Content>
+            </Checkbox>
+            <p className="-mt-1 ps-6 text-xs leading-4 text-[var(--muted)]" title={folderHint}>
+              {folderHint}
+            </p>
+            <BrowserPlacementSelect
+              className="w-full"
+              folders={browserFolders.folders}
+              auto={browserFolders.auto}
+              mode={placement.mode}
+              folderId={placement.folderId}
+              onChange={setPlacement}
+            />
+          </>
         ) : null}
       </section>
 

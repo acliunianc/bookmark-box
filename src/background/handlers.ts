@@ -10,6 +10,7 @@ import {
 } from '../core/parseTree'
 import {
   locateBookmarkFolderPath,
+  locateBookmarkSiblingFolder,
   readBrowserFolders,
   removeBrowserBookmark,
   supportsBrowserBookmarks,
@@ -708,7 +709,13 @@ async function handleSnapshotRestore(id: number): Promise<{ ok: true }> {
 /* ------------------------------------------------------------------ */
 
 async function handleBookmarkSummaries(): Promise<{
-  bookmarks: { id: string; title: string; url: string; tagIds: string[] }[]
+  bookmarks: {
+    id: string
+    title: string
+    url: string
+    tagIds: string[]
+    browserBookmarkId?: string
+  }[]
 }> {
   const bookmarks = await db.allBookmarks()
   return {
@@ -718,6 +725,7 @@ async function handleBookmarkSummaries(): Promise<{
         title: bookmark.title || bookmark.url,
         url: bookmark.url,
         tagIds: bookmark.tagIds,
+        browserBookmarkId: bookmark.browserBookmarkId,
       }))
       .sort((a, b) => a.title.localeCompare(b.title, 'zh')),
   }
@@ -763,6 +771,9 @@ export const handlers = {
   'page/context': handlePageContext,
   'data/bootstrap': handleBootstrap,
   'browser/folders': async () => readBrowserFolders(),
+  'browser/siblingFolder': async (payload: { url: string; browserBookmarkId?: string }) => ({
+    folder: await locateBookmarkSiblingFolder(payload),
+  }),
   'bookmark/summaries': handleBookmarkSummaries,
   'tag/fromFolder': handleTagsFromFolder,
   'bookmark/save': handleSaveBookmark,

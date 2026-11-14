@@ -138,6 +138,29 @@ export async function locateBookmarkFolderPath(url: string): Promise<string | nu
   return path || null
 }
 
+/**
+ * 找到某条书签所在的文件夹（把它放到同级时，目标就是这个 parent）。
+ * 优先用已记录的 browserBookmarkId，否则按 URL 在本机书签里查找。
+ */
+export async function locateBookmarkSiblingFolder(input: {
+  url: string
+  browserBookmarkId?: string
+}): Promise<{ id: string; path: string } | null> {
+  if (!supportsBrowserBookmarks()) return null
+
+  let node: chrome.bookmarks.BookmarkTreeNode | undefined
+  if (input.browserBookmarkId) {
+    const [tracked] = await chrome.bookmarks.get(input.browserBookmarkId).catch(() => [])
+    if (tracked?.url) node = tracked
+  }
+  if (!node && input.url) node = await findByUrl(input.url)
+  if (!node?.parentId) return null
+
+  const [parent] = await chrome.bookmarks.get(node.parentId).catch(() => [])
+  if (!parent || parent.url) return null
+  return { id: parent.id, path: await pathOf(parent) }
+}
+
 /** 精确按 URL 找已存在的浏览器书签，避免重复创建 */
 async function findByUrl(url: string): Promise<chrome.bookmarks.BookmarkTreeNode | undefined> {
   const matches = await chrome.bookmarks.search({ url }).catch(() => [])

@@ -40,6 +40,8 @@ export interface BookmarkSummary {
   title: string
   url: string
   tagIds: string[]
+  /** 已同步到本机浏览器书签时的 id；用于解析「同级文件夹」落点 */
+  browserBookmarkId?: string
 }
 
 export interface BootstrapData {
@@ -98,6 +100,14 @@ export interface RequestMap {
   'data/bootstrap': { req: Record<string, never>; res: BootstrapData }
   /** 本机浏览器书签的文件夹树（仅文件夹，用于同步落点选择） */
   'browser/folders': { req: Record<string, never>; res: BrowserFolderInfo }
+  /**
+   * 解析某条书签所在文件夹（与它同级放置时的目标）。
+   * 找不到本机对应书签时 folder 为 null。
+   */
+  'browser/siblingFolder': {
+    req: { url: string; browserBookmarkId?: string }
+    res: { folder: { id: string; path: string } | null }
+  }
   /** 未删除书签的摘要，供收藏弹窗复制标签 */
   'bookmark/summaries': { req: Record<string, never>; res: { bookmarks: BookmarkSummary[] } }
   /**

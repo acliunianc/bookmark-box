@@ -32,6 +32,10 @@ interface SearchSelectProps {
   options: SearchSelectOption[]
   placeholder?: string
   isDisabled?: boolean
+  /** 有选中项时显示清除按钮 */
+  isClearable?: boolean
+  /** 点击清除按钮时回调（由调用方把 value 置空） */
+  onClear?: () => void
   className?: string
 }
 
@@ -61,6 +65,8 @@ export function SearchSelect({
   label,
   value,
   onChange,
+  onClear,
+  isClearable,
   options,
   placeholder = '输入关键字搜索',
   isDisabled,
@@ -106,6 +112,10 @@ export function SearchSelect({
       selectedKey={value}
       placeholder={placeholder}
       isDisabled={isDisabled}
+      onClear={() => {
+        onClear?.()
+        onChange('')
+      }}
       onSelectionChange={(key) => {
         if (key != null) onChange(String(key))
       }}
@@ -138,6 +148,7 @@ export function SearchSelect({
             </span>
           </span>
         </Select.Value>
+        {isClearable ? <Select.ClearButton /> : null}
         <Select.Indicator />
       </Select.Trigger>
       <Select.Popover
