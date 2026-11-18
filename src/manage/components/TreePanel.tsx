@@ -10,8 +10,8 @@ interface TreePanelProps {
   selectedPath?: string
   onSelectPath: (path?: string) => void
   onBatchTag: (node: FolderNode) => void
-  onReadBrowser: () => void
-  onPickHtml: () => void
+  /** 打开导入弹窗（空树时的「导入」、以及已有树时的重新读取） */
+  onImport: () => void
   disabled?: boolean
 }
 
@@ -20,8 +20,7 @@ export function TreePanel({
   selectedPath,
   onSelectPath,
   onBatchTag,
-  onReadBrowser,
-  onPickHtml,
+  onImport,
   disabled,
 }: TreePanelProps) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
@@ -108,17 +107,12 @@ export function TreePanel({
     return (
       <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 p-4 text-center">
         <p className="text-xs text-[var(--muted)]">
-          文件树为只读快照，用「导入 HTML 书签」生成，用于批量打标签
+          文件树为只读快照，导入后可用于批量打标签
         </p>
-        <div className="flex items-center gap-2">
-          <Button size="sm" variant="secondary" onPress={onPickHtml} isDisabled={disabled}>
-            <IconUpload width={14} height={14} />
-            导入 HTML
-          </Button>
-          <Button size="sm" variant="ghost" onPress={onReadBrowser} isDisabled={disabled}>
-            读取浏览器书签
-          </Button>
-        </div>
+        <Button size="sm" variant="secondary" onPress={onImport} isDisabled={disabled}>
+          <IconUpload width={14} height={14} />
+          导入
+        </Button>
       </div>
     )
   }
@@ -135,8 +129,8 @@ export function TreePanel({
             isIconOnly
             variant="ghost"
             className="size-6 min-h-0 min-w-0 rounded p-0 text-[var(--muted)]"
-            aria-label="重新读取本机书签（整体替换快照）"
-            onPress={onReadBrowser}
+            aria-label="重新导入（整体替换快照）"
+            onPress={onImport}
           >
             <IconPlus width={13} height={13} className="rotate-45" />
           </Button>

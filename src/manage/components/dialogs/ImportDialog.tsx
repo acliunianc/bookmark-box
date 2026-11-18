@@ -199,17 +199,23 @@ export function ImportDialog({ open, bookmarks, settings, onClose, onImported }:
               上一步
             </Button>
           ) : null}
-          <Button variant="ghost" onPress={close} isDisabled={busy}>
-            {step === 'report' ? '完成' : '取消'}
-          </Button>
+          {step === 'report' ? (
+            <Button variant="ghost" onPress={() => void undoImport()} isDisabled={busy}>
+              撤销全部
+            </Button>
+          ) : (
+            <Button variant="ghost" onPress={close} isDisabled={busy}>
+              取消
+            </Button>
+          )}
           {step === 'preview' ? (
             <Button variant="primary" onPress={() => void apply()} isDisabled={busy}>
               {busy ? <Spinner size="sm" /> : `执行导入（${preview?.unique ?? 0} 条）`}
             </Button>
           ) : null}
           {step === 'report' ? (
-            <Button variant="secondary" onPress={() => void undoImport()} isDisabled={busy}>
-              撤销全部
+            <Button variant="primary" onPress={close} isDisabled={busy}>
+              完成
             </Button>
           ) : null}
         </>

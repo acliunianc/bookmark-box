@@ -627,8 +627,7 @@ export function ManageApp() {
               selectedPath={filter.treePath}
               onSelectPath={(path) => patchFilter({ treePath: path })}
               onBatchTag={(node) => setBatchNode(node)}
-              onReadBrowser={() => setImportOpen(true)}
-              onPickHtml={() => setImportOpen(true)}
+              onImport={() => setImportOpen(true)}
               disabled={pending}
             />
           }
